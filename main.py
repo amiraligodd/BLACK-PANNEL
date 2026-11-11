@@ -46,7 +46,7 @@ DEFAULTS = {"title": "Black Panel", "accent": "#7c5cff", "theme": "dark", "radiu
             "density": "normal", "layout": "list", "anim": "1", "shape": "squircle",
             "pbar": "gradient", "cardstyle": "glass", "preset": "midnight",
             "palette": "default", "fx": "none", "noise": "0", "border": "normal", "hover": "lift", "spot": "1",
-            "titlefx": "gradient", "btn": "gradient", "enter": "fade", "glow": "40", "bgimg": ""}
+            "titlefx": "gradient", "btn": "gradient", "enter": "fade", "glow": "40", "bgimg": "", "cands": ""}
 
 def settings():
     with L:
@@ -339,7 +339,7 @@ def put_settings(body: dict):
     with L:
         for k, v in body.items():
             if k in DEFAULTS:
-                db.execute("INSERT OR REPLACE INTO settings(k,v) VALUES(?,?)", (k, str(v)[:200]))
+                db.execute("INSERT OR REPLACE INTO settings(k,v) VALUES(?,?)", (k, str(v)[:2000]))
         db.commit()
     return {"ok": True}
 
