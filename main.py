@@ -10,7 +10,7 @@ ADMIN_USER = (os.environ.get("ADMIN_USER") or "admin").strip()
 ADMIN_PASSWORD = (os.environ.get("ADMIN_PASSWORD") or "99842222").strip()
 print(f"[panel] user={ADMIN_USER!r} password_length={len(ADMIN_PASSWORD)} source={'railway-variable' if os.environ.get('ADMIN_PASSWORD') else 'code'}", flush=True)
 # >>>>>>>>>> دامنه ریلوی خودتو اینجا بذار (بدون https://) <<<<<<<<<<
-RAILWAY_DOMAIN = "black-pannel.up.railway.app"
+RAILWAY_DOMAIN = "YOUR-DOMAIN.up.railway.app"
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 DOMAIN = os.environ.get("DOMAIN") or RAILWAY_DOMAIN
 # آدرس اتصال پیش‌فرض: اگه برای کاربر یا در تنظیمات آدرسی مشخص نشده باشه، کانفیگ‌ها به این آدرس وصل می‌شن
@@ -430,7 +430,7 @@ LOGIN = """<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">
 <style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,Tahoma,sans-serif;
 background:radial-gradient(900px 500px at 80% -10%,color-mix(in srgb,var(--a,#7c5cff) 70%,#000) 0,transparent 60%),radial-gradient(700px 500px at 0 110%,#0f6e8c 0,transparent 55%),#0a0c13;color:#eef0f8}
 .b{width:min(360px,92vw);padding:28px;border-radius:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(18px)}
-h2{margin:0 0 4px}p{margin:0 0 18px;color:#9aa3bd;font-size:14px}
+h2{margin:0 0 4px}.b{animation:fu .6s both}@keyframes fu{from{opacity:0;transform:translateY(18px)}}button:hover{filter:brightness(1.12)}p{margin:0 0 18px;color:#9aa3bd;font-size:14px}
 input{width:100%;padding:13px 14px;margin:6px 0;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.3);color:#fff;font-size:15px}
 button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;background:linear-gradient(135deg,var(--a,#7c5cff),var(--a2,#5b8cff));color:#fff;font-size:16px;font-weight:700}
 #e{color:#ff6b7a;font-size:13px;min-height:18px;margin-top:8px}</style></head><body>
