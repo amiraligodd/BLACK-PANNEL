@@ -111,6 +111,34 @@ body[data-bt=pill] .btn,body[data-bt=pill] .fab,body[data-bt=pill] .chip,body[da
 body[data-bt=outline] .btn.p,body[data-bt=outline] .fab,body[data-bt=outline] .chip.on{background:transparent;color:var(--a);border:2px solid var(--a);box-shadow:none}
 .gp{border:1px solid var(--b);border-radius:14px;padding:2px 12px 12px;margin:10px 0;background:var(--c)}
 .gp summary{cursor:pointer;padding:11px 0;font-weight:700}
+
+header{position:sticky;top:0;z-index:15;margin:-14px -14px 12px;padding:12px 14px;-webkit-backdrop-filter:blur(var(--bl));backdrop-filter:blur(var(--bl));background:color-mix(in srgb,var(--bg) 72%,transparent);border-bottom:1px solid var(--b)}
+#mc{z-index:40}
+.mh{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.mh h3{margin:0}.mh small{color:var(--m)}
+.mi{width:46px;height:46px;flex:none;border-radius:14px;display:grid;place-items:center;font-size:22px;background:linear-gradient(135deg,var(--a),var(--a2));box-shadow:0 6px calc(var(--gl)*22px) color-mix(in srgb,var(--a) calc(var(--gl)*60%),transparent)}
+.x{margin-inline-start:auto;width:38px;height:38px;flex:none;border-radius:12px;border:1px solid var(--b);background:var(--c2);color:var(--t);cursor:pointer;font-size:16px}
+.sec{border:1px solid var(--b);background:var(--c);border-radius:var(--r);padding:12px;margin:10px 0}
+.sec h4{margin:0 0 8px;font-size:14px}
+.sumc{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px;border-radius:var(--r);border:1px solid var(--b);background:linear-gradient(135deg,color-mix(in srgb,var(--a) 16%,transparent),color-mix(in srgb,var(--a2) 10%,transparent))}
+.sumc div{text-align:center}.sumc b{display:block;font-size:16px}.sumc small{color:var(--m);font-size:11px}
+.sumc .wide{grid-column:1/-1;border-top:1px dashed var(--b);padding-top:8px}
+.ptiles,.tpls,.lks{display:grid;grid-template-columns:1fr 1fr;gap:8px}.lks{grid-template-columns:repeat(3,1fr)}
+.pt,.tp{padding:11px;border:1.5px solid var(--b);border-radius:14px;cursor:pointer;background:var(--in);transition:.2s;position:relative}
+.pt b,.tp b{display:block}.pt small,.tp small{color:var(--m);font-size:11.5px}
+.pt.on{border-color:var(--a);background:color-mix(in srgb,var(--a) 15%,transparent)}
+.pt.on::after{content:"✓";position:absolute;top:6px;left:9px;color:var(--a);font-weight:900}
+.tp{background:linear-gradient(135deg,color-mix(in srgb,var(--a) 18%,transparent),transparent)}.tp:active,.pt:active{transform:scale(.96)}
+.lk2{padding:15px 8px;border-radius:14px;color:#fff;font-weight:800;text-align:center;cursor:pointer;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,.45);transition:.2s}.lk2:hover{transform:scale(1.05)}
+.rw{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0}
+.sw2{width:48px;height:27px;border-radius:99px;background:var(--in);border:1px solid var(--b);position:relative;cursor:pointer;flex:none;transition:.25s}
+.sw2 i{position:absolute;top:2px;right:2px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.25s}
+.sw2.on{background:var(--a)}.sw2.on i{right:24px}
+.big{font-size:22px;font-weight:800;text-align:center}
+input[type=range]{accent-color:var(--a);padding:0;margin-top:8px}
+.stk{position:sticky;bottom:-18px;margin:14px -18px -18px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 38%)}
+.stk .btn{padding:13px 6px;font-size:15px}
+.empty p{margin:6px 0 14px}
 </style>
 </head>
 <body data-bg="gradient" data-an="on">
@@ -141,6 +169,7 @@ body[data-bt=outline] .btn.p,body[data-bt=outline] .fab,body[data-bt=outline] .c
 <!-- qr modal -->
 <div class="mo" id="mq" onclick="if(event.target===this)cl('mq')"><div class="sh" id="mqb" style="text-align:center"></div></div>
 <div class="mo" id="ms" onclick="if(event.target===this)closeSet()"><div class="sh" id="sb"></div></div>
+<div class="mo" id="mc"><div class="sh" id="mcb"></div></div>
 <div id="toast"></div>
 
 <script>
@@ -209,12 +238,12 @@ function render(){const an=!window._r;window._r=1;
   <div class="pb"><div style="width:${u.limit_bytes?p:100}%;background:${barBg(col)};${u.limit_bytes?'':'opacity:.35'}"></div></div>
   <div class="meta"><span>${fb(used)} / ${u.limit_bytes?fb(u.limit_bytes):'♾️'}</span><span>${exp}</span></div>
   <div class="meta" style="margin-top:3px"><span>↑ ${fb(u.up)}</span><span>↓ ${fb(u.down)}</span></div>
-  <div class="act"><button class="btn p" onclick="qr(${u.id})">QR / لینک</button>
-  <button class="btn" onclick="cp(location.origin+'/sub/${u.token}')">ساب</button>
-  <button class="btn" onclick="openUser(${u.id})">ویرایش</button>
+  <div class="act"><button class="btn p" onclick="qr(${u.id})">📲 لینک</button>
+  <button class="btn" onclick="cp(location.origin+'/sub/${u.token}')">🔗 ساب</button>
+  <button class="btn" onclick="openUser(${u.id})">✏️</button>
   <button class="btn" onclick="up(${u.id},{enabled:${!u.enabled}})">${u.enabled?'⏸':'▶️'}</button>
-  <button class="btn" onclick="if(confirm('مصرف صفر شود؟'))up(${u.id},{reset:true})">ریست</button>
-  <button class="btn d" onclick="rm(${u.id})">🗑</button></div></div>`}).join(''):'<div class="empty">کاربری پیدا نشد</div>'}
+  <button class="btn" onclick="ask('مصرف صفر شود؟','ریست').then(y=>y&&up(${u.id},{reset:true}))">♻️</button>
+  <button class="btn d" onclick="rm(${u.id})">🗑</button></div></div>`}).join(''):'<div class="empty"><div style="font-size:54px">🛰️</div><p>'+(users.length?'کاربری با این فیلتر پیدا نشد':'هنوز کاربری نساختی')+'</p><button class="btn p" style="flex:none;padding:10px 24px" onclick="openUser()">＋ ساخت کاربر</button></div>'}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 async function load(){
@@ -223,34 +252,40 @@ async function load(){
  $('s1').textContent=s.users;$('s2').textContent=s.active;$('s3').textContent=fb(s.traffic);
  $('s4').textContent=s.ram_total?Math.round(s.ram_used/s.ram_total*100)+'% · '+s.load.toFixed(2):'–'}
 
-const PROTOS=[['vmess','VMess'],['vless','VLESS'],['trojan','Trojan'],['vlessh','VLESS-HU']];
+const PROTOS=[['vmess','VMess','🔷','سازگار با اکثر اپ‌ها'],['vless','VLESS','⚡','پروتکل سبک و مدرن'],['trojan','Trojan','🛡️','شبیه ترافیک HTTPS'],['vlessh','VLESS-HU','🚀','انتقال HTTPUpgrade']];
 const FPS=[['','پیش‌فرض'],['android','android'],['chrome','chrome'],['firefox','firefox'],['safari','safari'],['ios','ios'],['random','random']];
 const PORTS=[['443','443 TLS'],['80','80 بدون TLS'],['8443','8443'],['2053','2053'],['2096','2096']];
-const TPL=[['🧪 تست','1','1'],['📅 ماهانه','50','30'],['💎 سه‌ماهه','150','90'],['♾️ نامحدود','0','0']];
+const TPL=[['🧪','تست','۱ گیگ · ۱ روز',1,1],['📅','ماهانه','۵۰ گیگ · ۳۰ روز',50,30],['💎','سه‌ماهه','۱۵۰ گیگ · ۹۰ روز',150,90],['♾️','نامحدود','بدون حجم و زمان',0,0]];
 const chip=(g,v,t,on)=>`<div class="chip ${on?'on':''}" data-g="${g}" data-v="${v}" onclick="tg(this)">${t}</div>`;
 const gv=g=>[...document.querySelectorAll(`#mub [data-g=${g}].on`)].map(x=>x.dataset.v);
-function tg(e){const g=e.dataset.g;if(['proto','first','en'].includes(g))e.classList.toggle('on');else{document.querySelectorAll(`#mub [data-g=${g}]`).forEach(x=>x.classList.remove('on'));e.classList.add('on')}}
-const sv=(id,v)=>{$(id).value=v};
+function tg(e){const g=e.dataset.g;if(['proto','first','en'].includes(g))e.classList.toggle('on');else{document.querySelectorAll(`#mub [data-g=${g}]`).forEach(x=>x.classList.remove('on'));e.classList.add('on')}sum()}
+const setv=(i,v)=>{$(i).value=v;const r=$('r'+i);if(r)r.value=v;sum()};
 const rnd=()=>Math.random().toString(36).slice(2,8);
-const qc=(id,arr,suf)=>`<div class="chips wrap" style="margin-top:6px">${arr.map(x=>`<div class="chip" onclick="sv('${id}',${x})">${x?x+suf:'♾️'}</div>`).join('')}</div>`;
+const qc=(id,arr,suf)=>`<div class="chips wrap" style="margin-top:8px">${arr.map(x=>`<div class="chip" onclick="setv('${id}',${x})">${x?x+suf:'♾️'}</div>`).join('')}</div>`;
+const swc=(g,on,t)=>`<div class="rw"><span>${t}</span><div class="sw2 ${on?'on':''}" data-g="${g}" data-v="1" onclick="tg(this)"><i></i></div></div>`;
+function sum(){if(!$('sum'))return;const gb=+$('fg').value||0,d=+$('fd').value||0,P=gv('proto'),first=gv('first').length,n=+($('fc')?$('fc').value:1)||1;
+ const ex=d?(first?'⏳ '+d+' روز از اولین اتصال':new Date(Date.now()+d*864e5).toLocaleDateString('fa-IR')):'♾️ نامحدود';
+ $('sum').innerHTML=`<div><b>${P.length}</b><small>پروتکل</small></div><div><b>${gb?gb+' GB':'♾️'}</b><small>حجم</small></div><div><b>${d?d+' روز':'♾️'}</b><small>مدت</small></div><div><b>${gv('port')[0]||443}</b><small>پورت</small></div><div class="wide"><small>انقضا: ${ex}${n>1?' · ساخت '+n+' کاربر':''}</small></div>`}
 function openUser(id){editId=id||null;const u=users.find(x=>x.id===id),E=!!u,ps=E?u.protos.split(','):['vmess'];
- $('mub').innerHTML=`<h3>${E?'✏️ ویرایش کاربر':'➕ کاربر جدید'}</h3>
- ${E?'':`<label>قالب‌های آماده</label><div class="chips wrap">${TPL.map(t=>`<div class="chip" onclick="sv('fg',${t[1]});sv('fd',${t[2]})">${t[0]}</div>`).join('')}</div>`}
- <label>نام</label><div class="row"><input id="fn" value="${E?esc(u.name):''}"><button class="btn" style="flex:0 0 52px" onclick="sv('fn','user-'+rnd())">🎲</button></div>
- <label>پروتکل‌ها (چندتایی)</label><div class="chips wrap">${PROTOS.map(([v,t])=>chip('proto',v,t,ps.includes(v))).join('')}</div>
- <label>حجم (GB) — 0 = نامحدود</label><input id="fg" type="number" min="0" step="any" value="${E?+(u.limit_bytes/GB).toFixed(2):0}">${qc('fg',[1,5,10,20,50,100,0],' GB')}
- <label>مدت (روز) — 0 = نامحدود</label><input id="fd" type="number" min="0" value="${E&&u.expire?Math.max(0,Math.ceil((u.expire-Date.now()/1000)/86400)):0}">${qc('fd',[1,7,30,60,90,180,0],' روز')}
- ${E?'':`<div class="chips wrap" style="margin-top:8px">${chip('first','1','⏳ شروع زمان از اولین اتصال',false)}</div>`}
- <label>پورت و امنیت</label><div class="chips wrap">${PORTS.map(([v,t])=>chip('port',v,t,String(E?u.port:443)===v)).join('')}</div>
+ const gb0=E?+(u.limit_bytes/GB).toFixed(2):0,d0=E&&u.expire?Math.max(0,Math.ceil((u.expire-Date.now()/1000)/86400)):0;
+ $('mub').innerHTML=`<div class="mh"><div class="mi">${E?'✏️':'✨'}</div><div><h3>${E?'ویرایش کاربر':'ساخت کانفیگ جدید'}</h3><small>${E?esc(u.name):'همه‌چیز رو قبل از ساخت تنظیم کن'}</small></div><button class="x" onclick="cl('mu')">✕</button></div>
+ <div class="sumc" id="sum"></div>
+ ${E?'':`<div class="sec"><h4>⚡ قالب‌های آماده</h4><div class="tpls">${TPL.map(t=>`<div class="tp" onclick="setv('fg',${t[3]});setv('fd',${t[4]})"><b>${t[0]} ${t[1]}</b><small>${t[2]}</small></div>`).join('')}</div></div>`}
+ <div class="sec"><h4>👤 هویت</h4><div class="row"><input id="fn" placeholder="نام کاربر" value="${E?esc(u.name):''}"><button class="btn" style="flex:0 0 52px" onclick="$('fn').value='user-'+rnd()">🎲</button></div>
+ <textarea id="fnote" rows="2" placeholder="یادداشت (اختیاری)" style="margin-top:8px">${E?esc(u.note):''}</textarea></div>
+ <div class="sec"><h4>🔌 پروتکل‌ها (چندتایی)</h4><div class="ptiles">${PROTOS.map(([v,t,ic,ds])=>`<div class="pt ${ps.includes(v)?'on':''}" data-g="proto" data-v="${v}" onclick="tg(this)"><b>${ic} ${t}</b><small>${ds}</small></div>`).join('')}</div></div>
+ <div class="sec"><h4>📦 حجم (GB) — ۰ = نامحدود</h4><input id="fg" class="big" type="number" min="0" step="any" value="${gb0}"><input id="rfg" type="range" min="0" max="500" value="${Math.min(gb0,500)}">${qc('fg',[1,5,10,20,50,100,0],' GB')}</div>
+ <div class="sec"><h4>⏱️ مدت (روز) — ۰ = نامحدود</h4><input id="fd" class="big" type="number" min="0" value="${d0}"><input id="rfd" type="range" min="0" max="365" value="${Math.min(d0,365)}">${qc('fd',[1,7,30,60,90,180,0],' روز')}
+ ${E?'':swc('first',false,'⏳ شروع زمان از اولین اتصال')}</div>
+ <div class="sec"><h4>🌐 اتصال</h4><div class="chips wrap">${PORTS.map(([v,t])=>chip('port',v,t,String(E?u.port:443)===v)).join('')}</div>
  <label>Fingerprint</label><div class="chips wrap">${FPS.map(([v,t])=>chip('fp',v,t,(E?u.fp:'')===v)).join('')}</div>
- <label>آدرس اتصال اختصاصی (اختیاری)</label><input id="fa" dir="ltr" value="${E?esc(u.addr):''}" placeholder="IP یا دامنه">
- ${E?'':`<label>تعداد (ساخت گروهی)</label><div class="row"><button class="btn" onclick="sv('fc',Math.max(1,+$('fc').value-1))">−</button><input id="fc" type="number" value="1" min="1" max="200" style="text-align:center"><button class="btn" onclick="sv('fc',Math.min(200,+$('fc').value+1))">＋</button></div>
- <label>UUID دلخواه (خالی = خودکار)</label><div class="row"><input id="fu" dir="ltr"><button class="btn" style="flex:0 0 52px" onclick="sv('fu',crypto.randomUUID())">🎲</button></div>`}
- <label>یادداشت</label><textarea id="fnote" rows="2">${E?esc(u.note):''}</textarea>
- <div class="chips wrap" style="margin-top:8px">${chip('en','1','✅ فعال',E?!!u.enabled:true)}</div>
- ${E?`<label>افزودن سریع</label><div class="act" style="margin-top:0"><button class="btn" onclick="quick({add_days:30})">+۳۰ روز</button><button class="btn" onclick="quick({add_gb:10})">+۱۰ گیگ</button><button class="btn" onclick="quick({add_gb:50})">+۵۰ گیگ</button></div>`:''}
- <div class="act"><button class="btn p" onclick="saveUser()">${E?'ذخیره':'🚀 ساخت کانفیگ'}</button><button class="btn" onclick="cl('mu')">بستن</button></div>`;
- $('mu').classList.add('on')}
+ <label>آدرس اتصال اختصاصی (اختیاری)</label><input id="fa" dir="ltr" value="${E?esc(u.addr):''}" placeholder="IP یا دامنه"></div>
+ <div class="sec"><h4>⚙️ پیشرفته</h4>${swc('en',E?!!u.enabled:true,'✅ فعال')}
+ ${E?`<label>افزودن سریع</label><div class="act" style="margin-top:0"><button class="btn" onclick="quick({add_days:30})">+۳۰ روز</button><button class="btn" onclick="quick({add_gb:10})">+۱۰ گیگ</button><button class="btn" onclick="quick({add_gb:50})">+۵۰ گیگ</button></div>`:`<label>تعداد (ساخت گروهی)</label><div class="row"><button class="btn" onclick="setv('fc',Math.max(1,+$('fc').value-1))">−</button><input id="fc" type="number" value="1" min="1" max="200" style="text-align:center"><button class="btn" onclick="setv('fc',Math.min(200,+$('fc').value+1))">＋</button></div>
+ <label>UUID دلخواه (خالی = خودکار)</label><div class="row"><input id="fu" dir="ltr"><button class="btn" style="flex:0 0 52px" onclick="$('fu').value=crypto.randomUUID()">🎲</button></div>`}</div>
+ <div class="act stk"><button class="btn p" onclick="saveUser()">${E?'💾 ذخیره':'🚀 ساخت کانفیگ'}</button><button class="btn" onclick="cl('mu')">بستن</button></div>`;
+ $('mub').oninput=e=>{const t=e.target;if(t.id==='fg'||t.id==='fd'){const r=$('r'+t.id);if(r)r.value=t.value}if(t.id==='rfg'||t.id==='rfd')$(t.id.slice(1)).value=t.value;sum()};
+ $('mu').classList.add('on');$('mub').scrollTop=0;sum()}
 async function saveUser(){const E=!!editId,b={name:$('fn').value||'user',gb:+$('fg').value||0,days:+$('fd').value||0,note:$('fnote').value,
  protos:gv('proto'),port:+(gv('port')[0]||443),fp:gv('fp')[0]||'',addr:$('fa').value.trim(),enabled:!!gv('en').length};
  if(!b.protos.length)return toast('⚠️ حداقل یک پروتکل انتخاب کن');
@@ -259,14 +294,19 @@ async function saveUser(){const E=!!editId,b={name:$('fn').value||'user',gb:+$('
  cl('mu');toast(E?'✅ ذخیره شد':b.count>1?'✅ '+b.count+' کانفیگ ساخته شد':'✅ کانفیگ ساخته شد');await load();
  if(!E&&b.count===1&&users[0])qr(users[0].id)}
 async function quick(b){await api('PUT','/api/users/'+editId,b);toast('✅ اعمال شد');cl('mu');load()}
+function ask(msg,ok='تأیید'){return new Promise(res=>{$('mcb').innerHTML=`<div class="mh"><div class="mi">❓</div><h3>${msg}</h3></div><div class="act"><button class="btn p" id="mc_y">${ok}</button><button class="btn" id="mc_n">انصراف</button></div>`;
+ const f=v=>{cl('mc');res(v)};$('mc_y').onclick=()=>f(true);$('mc_n').onclick=()=>f(false);$('mc').onclick=e=>{if(e.target.id==='mc')f(false)};$('mc').classList.add('on')})}
 async function up(i,b){await api('PUT','/api/users/'+i,b);load()}
-async function rm(i){if(confirm('این کاربر حذف شود؟')){await api('DELETE','/api/users/'+i);load()}}
-let QL=[];
-function qr(id){const u=users.find(x=>x.id===id);qs=location.origin+'/sub/'+u.token;QL=u.links;
- $('mqb').innerHTML=`<h3>${esc(u.name)}</h3><div id="qr"></div><div class="lk" id="ql"></div>
- <div class="act"><button class="btn p" onclick="cp(qs)">کپی لینک ساب</button><button class="btn" onclick="showQ(qs)">QR ساب</button></div>
- ${QL.map((x,i)=>`<div class="act"><button class="btn" onclick="cp(QL[${i}].l)">📋 ${PN[x.p]}</button><button class="btn" onclick="showQ(QL[${i}].l)">QR ${PN[x.p]}</button></div>`).join('')}
- <div class="act"><button class="btn" onclick="cl('mq')">بستن</button></div>`;showQ(qs);$('mq').classList.add('on')}
+async function rm(i){if(await ask('این کاربر حذف شود؟','حذف')){await api('DELETE','/api/users/'+i);load()}}
+let QL=[],QI=0;
+function qr(id){const u=users.find(x=>x.id===id);qs=location.origin+'/sub/'+u.token;QL=[{p:'sub',l:qs},...u.links];
+ $('mqb').innerHTML=`<div class="mh"><div class="mi">📲</div><div style="text-align:right"><h3>${esc(u.name)}</h3><small>${fb(u.up+u.down)} / ${u.limit_bytes?fb(u.limit_bytes):'♾️'}</small></div><button class="x" onclick="cl('mq')">✕</button></div>
+ <div class="chips wrap" style="justify-content:center" id="qtabs">${QL.map((x,i)=>`<div class="chip" onclick="showT(${i})">${x.p==='sub'?'🔗 ساب':PN[x.p]}</div>`).join('')}</div>
+ <div id="qr"></div><div class="lk" id="ql"></div>
+ <div class="act stk"><button class="btn p" onclick="cp(QL[QI].l)">📋 کپی</button><button class="btn" onclick="shareQ()">📤 اشتراک</button></div>`;
+ $('mq').classList.add('on');showT(0)}
+function showT(i){QI=i;document.querySelectorAll('#qtabs .chip').forEach((c,j)=>c.classList.toggle('on',j===i));showQ(QL[i].l)}
+function shareQ(){const t=QL[QI].l;navigator.share?navigator.share({text:t}).catch(()=>{}):cp(t)}
 function showQ(t){$('qr').innerHTML='';$('ql').textContent=t;if(window.QRCode)new QRCode($('qr'),{text:t,width:210,height:210,correctLevel:QRCode.CorrectLevel.L})}
 
 const PRE={midnight:['#7c5cff','#38d4ff','نیمه‌شب'],ocean:['#0ea5e9','#22d3ee','اقیانوس'],aurora:['#10b981','#6366f1','شفق'],sunset:['#f97316','#ec4899','غروب'],rose:['#f43f5e','#fb923c','رز'],forest:['#22c55e','#a3e635','جنگل'],gold:['#f59e0b','#ef4444','طلا'],violet:['#a855f7','#ec4899','بنفش'],cyber:['#00f5d4','#9b5de5','سایبر'],mono:['#94a3b8','#e2e8f0','مونو']};
@@ -305,8 +345,8 @@ const g=k=>S[k]??DEF[k];
 function fld(k){const o=OPT[k],r=RNG[k];return o?`<label>${o[0]}</label><select id="s_${k}">${o[1].map(([a,b])=>`<option value="${a}">${b}</option>`).join('')}</select>`:`<label>${r[0]}: <b id="v_${k}">${g(k)}</b></label><input id="s_${k}" type="range" min="${r[1]}" max="${r[2]}" value="${g(k)}">`}
 function openSet(){
  const col=(k,n)=>`<div><label>${n}</label><input id="s_${k}" type="color" value="${g(k)}" style="height:44px;padding:4px"></div>`;
- $('sb').innerHTML=`<h3>🎨 استودیوی ظاهر</h3><label>عنوان پنل</label><input id="s_title" value="${esc(S.title)}">
- <label>✨ ظاهرهای آماده (یک‌ضربه)</label><div class="chips wrap">${Object.entries(LOOKS).map(([k,[n]])=>`<div class="chip" onclick="look('${k}')">${n}</div>`).join('')}</div>
+ $('sb').innerHTML=`<div class="mh"><div class="mi">🎨</div><div><h3>استودیوی ظاهر</h3><small>تغییرها زنده دیده می‌شن</small></div><button class="x" onclick="closeSet()">✕</button></div><label>عنوان پنل</label><input id="s_title" value="${esc(S.title)}">
+ <label>✨ ظاهرهای آماده (یک‌ضربه)</label><div class="lks">${Object.entries(LOOKS).map(([k,[n,o]])=>`<div class="lk2" style="background:linear-gradient(135deg,${o.accent||'#7c5cff'},${o.accent2||'#38d4ff'})" onclick="look('${k}')">${n}</div>`).join('')}</div>
  <label>رنگ‌های آماده</label><div class="sw">${Object.entries(PRE).map(([k,[a,b,n]])=>`<span title="${n}" style="background:linear-gradient(135deg,${a},${b})" onclick="pre('${k}')"></span>`).join('')}</div>
  <div class="row">${col('accent','رنگ اصلی')}${col('accent2','رنگ دوم')}</div>
  ${GRP.map(([t,ks,op])=>`<details class="gp" ${op?'open':''}><summary>${t}</summary>${ks.map(k=>fld(k)).join('')}${t.includes('پس‌زمینه')?`<label>آدرس عکس پس‌زمینه (برای حالت «عکس»)</label><input id="s_bgimg" dir="ltr" value="${esc(S.bgimg||'')}" placeholder="https://...">`:''}</details>`).join('')}
@@ -316,7 +356,7 @@ function openSet(){
  <label>آدرس اتصال (IP یا دامنه؛ خالی = آدرس پیش‌فرض کد)</label><input id="s_address" dir="ltr" value="${esc(S.address)}">
  <div class="row"><div><label>Fingerprint</label><select id="s_fp">${['android','chrome','firefox','safari','ios','random'].map(x=>`<option>${x}</option>`).join('')}</select></div>
  <div><label>پیشوند نام کانفیگ</label><input id="s_prefix" value="${esc(S.prefix)}"></div></div></details>
- <div class="act"><button class="btn p" onclick="saveSet()">ذخیره</button><button class="btn" onclick="resetSet()">پیش‌فرض ظاهر</button><button class="btn" onclick="closeSet()">بستن</button></div>`;
+ <div class="act stk"><button class="btn p" onclick="saveSet()">💾 ذخیره</button><button class="btn" onclick="resetSet()">پیش‌فرض ظاهر</button><button class="btn" onclick="closeSet()">بستن</button></div>`;
  for(const k in OPT)$('s_'+k).value=g(k);$('s_fp').value=S.fp;
  $('sb').oninput=prev;$('ms').classList.add('on')}
 function val(){const T={...S};document.querySelectorAll('#sb [id^=s_]').forEach(e=>T[e.id.slice(2)]=e.value);for(const k in RNG){const e=$('v_'+k);if(e)e.textContent=T[k]}return T}
@@ -328,7 +368,7 @@ function imp(){const t=prompt('متن ظاهر رو اینجا بچسبون');if
 function closeSet(){cl('ms');applyTheme()}
 async function saveSet(){const b={};document.querySelectorAll('#sb [id^=s_]').forEach(e=>b[e.id.slice(2)]=e.value);
  await api('PUT','/api/settings',b);cl('ms');toast('✅ تنظیمات ذخیره شد');load()}
-async function resetSet(){if(confirm('ظاهر به پیش‌فرض برگردد؟')){await api('PUT','/api/settings',DEF);cl('ms');toast('✅ برگشت به پیش‌فرض');load()}}
+async function resetSet(){if(await ask('ظاهر به پیش‌فرض برگردد؟','بازنشانی')){await api('PUT','/api/settings',DEF);cl('ms');toast('✅ برگشت به پیش‌فرض');load()}}
 
 load();setInterval(load,30000);
 </script>
