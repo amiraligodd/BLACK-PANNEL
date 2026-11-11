@@ -283,7 +283,7 @@ function openUser(id){editId=id||null;const u=users.find(x=>x.id===id),E=!!u,ps=
  ${E?'':swc('first',false,'⏳ شروع زمان از اولین اتصال')}</div>
  <div class="sec"><h4>🌐 اتصال</h4><div class="chips wrap">${PORTS.map(([v,t])=>chip('port',v,t,String(E?u.port:443)===v)).join('')}</div>
  <label>Fingerprint</label><div class="chips wrap">${FPS.map(([v,t])=>chip('fp',v,t,(E?u.fp:'')===v)).join('')}</div>
- <label>آدرس اتصال اختصاصی (اختیاری)</label><div class="row"><input id="fa" dir="ltr" value="${E?esc(u.addr):''}" placeholder="IP یا دامنه"><button class="btn" style="flex:0 0 88px" onclick="testAddr()">🧪 تست</button></div><div id="ats" class="ats"></div></div>
+ <label>آدرس اتصال اختصاصی (اختیاری)</label><div class="row"><input id="fa" dir="ltr" value="${E?esc(u.addr):''}" placeholder="IP یا دامنه"><button class="btn" style="flex:0 0 88px" onclick="testAddr()">🧪 تست</button><button class="btn" style="flex:0 0 88px" onclick="autoFind()">🔎 خودکار</button></div><div id="ats" class="ats"></div></div>
  <div class="sec"><h4>⚙️ پیشرفته</h4>${swc('en',E?!!u.enabled:true,'✅ فعال')}
  ${E?`<label>افزودن سریع</label><div class="act" style="margin-top:0"><button class="btn" onclick="quick({add_days:30})">+۳۰ روز</button><button class="btn" onclick="quick({add_gb:10})">+۱۰ گیگ</button><button class="btn" onclick="quick({add_gb:50})">+۵۰ گیگ</button></div>`:`<label>تعداد (ساخت گروهی)</label><div class="row"><button class="btn" onclick="setv('fc',Math.max(1,+$('fc').value-1))">−</button><input id="fc" type="number" value="1" min="1" max="200" style="text-align:center"><button class="btn" onclick="setv('fc',Math.min(200,+$('fc').value+1))">＋</button></div>
  <label>UUID دلخواه (خالی = خودکار)</label><div class="row"><input id="fu" dir="ltr"><button class="btn" style="flex:0 0 52px" onclick="$('fu').value=crypto.randomUUID()">🎲</button></div>`}</div>
@@ -315,6 +315,19 @@ async function testAddr(id='fa',box='ats'){let a=$(id).value.trim().replace(/^ht
  const r=await ping1(`https://${a}/ping?t=${Date.now()}`,5000);
  if(r.to)return setAT('bad','❌ جواب نداد (احتمالاً بسته یا فیلتره)',a,id,box);
  setAT('warn',`🟡 آدرس از اینترنت تو در دسترسه (${Math.round(r.ms)}ms) · تقریبی: مرورگر نمی‌تونه SNI دامنه‌ت رو بفرسته، تست کامل مسیر فقط در اپ (تأخیر واقعی) ممکنه`,a,id,box)}
+async function autoFind(id='fa',box='ats'){
+ const cand=[...new Set([S.domain||S.default_domain||'',...(S.cands||'').split(/[\s,]+/)].map(x=>x.trim().replace(/^https?:\/\//,'').replace(/[\/?#].*$/,'')).filter(x=>x&&!isIP(x)&&!x.includes('YOUR-DOMAIN')))];
+ if(!cand.length)return setAT('bad','❌ دامنه‌ای برای تست نیست؛ در ⚙️ بخش اتصال کاندید اضافه کن',0,id,box);
+ let best=null;
+ for(let k=0;k<cand.length&&!best;k+=4){
+  setAT('run',`⏳ در حال تست با اینترنت تو: ${Math.min(k+4,cand.length)} از ${cand.length}`,0,id,box);
+  const R=await Promise.all(cand.slice(k,k+4).map(async d=>{const a=await ping1(`https://${d}/ping?t=${Date.now()}`,5000);if(!a.ok)return null;const b=await ping1(`https://${d}/ping?t=${Date.now()+1}`,5000);return b.ok?{d,ms:(a.ms+b.ms)/2}:null}));
+  const ok=R.filter(Boolean).sort((x,y)=>x.ms-y.ms);if(ok.length)best=ok[0]}
+ if(!best)return setAT('bad',`❌ هیچ‌کدوم از ${cand.length} آدرس با اینترنت تو کار نکرد`,0,id,box);
+ $(id).value=best.d;setAT('ok',`✅ ${best.d} · ${Math.round(best.ms)}ms · اولین آدرس سالم`,best.d,id,box);
+ if(id==='s_address'){await api('PUT','/api/settings',{address:best.d});S.address=best.d;toast('✅ آدرس پیش‌فرض همه‌ی کانفیگ‌ها شد')}
+ else if(editId){await api('PUT','/api/users/'+editId,{addr:best.d});toast('✅ روی کانفیگ اعمال شد');load()}
+ else toast('✅ با ساخت کانفیگ اعمال می‌شه')}
 function ask(msg,ok='تأیید'){return new Promise(res=>{$('mcb').innerHTML=`<div class="mh"><div class="mi">❓</div><h3>${msg}</h3></div><div class="act"><button class="btn p" id="mc_y">${ok}</button><button class="btn" id="mc_n">انصراف</button></div>`;
  const f=v=>{cl('mc');res(v)};$('mc_y').onclick=()=>f(true);$('mc_n').onclick=()=>f(false);$('mc').onclick=e=>{if(e.target.id==='mc')f(false)};$('mc').classList.add('on')})}
 async function up(i,b){await api('PUT','/api/users/'+i,b);load()}
@@ -374,7 +387,8 @@ function openSet(){
  <div class="act"><button class="btn" onclick="cp(JSON.stringify(ap()))">📤 کپی ظاهر</button><button class="btn" onclick="imp()">📥 اعمال از متن</button></div>
  <details class="gp"><summary>🌐 اتصال</summary>
  <label>دامنه ریلوی (SNI و Host)</label><input id="s_domain" dir="ltr" value="${esc(S.domain||S.default_domain)}" placeholder="your-app.up.railway.app">
- <label>آدرس اتصال (IP یا دامنه؛ خالی = آدرس پیش‌فرض کد)</label><div class="row"><input id="s_address" dir="ltr" value="${esc(S.address)}"><button class="btn" style="flex:0 0 88px" onclick="testAddr('s_address','ats2')">🧪 تست</button></div><div id="ats2" class="ats"></div>
+ <label>آدرس اتصال (IP یا دامنه؛ خالی = آدرس پیش‌فرض کد)</label><div class="row"><input id="s_address" dir="ltr" value="${esc(S.address)}"><button class="btn" style="flex:0 0 88px" onclick="testAddr('s_address','ats2')">🧪 تست</button><button class="btn" style="flex:0 0 88px" onclick="autoFind('s_address','ats2')">🔎 خودکار</button></div><div id="ats2" class="ats"></div>
+ <label>کاندیدهای تست خودکار (هر خط یک دامنه که به سرور تو می‌رسه)</label><textarea id="s_cands" dir="ltr" rows="3" placeholder="vpn.mydomain.com">${esc(S.cands||'')}</textarea>
  <div class="row"><div><label>Fingerprint</label><select id="s_fp">${['android','chrome','firefox','safari','ios','random'].map(x=>`<option>${x}</option>`).join('')}</select></div>
  <div><label>پیشوند نام کانفیگ</label><input id="s_prefix" value="${esc(S.prefix)}"></div></div></details>
  <div class="act stk"><button class="btn p" onclick="saveSet()">💾 ذخیره</button><button class="btn" onclick="resetSet()">پیش‌فرض ظاهر</button><button class="btn" onclick="closeSet()">بستن</button></div>`;
@@ -382,7 +396,7 @@ function openSet(){
  $('sb').oninput=prev;$('ms').classList.add('on')}
 function val(){const T={...S};document.querySelectorAll('#sb [id^=s_]').forEach(e=>T[e.id.slice(2)]=e.value);for(const k in RNG){const e=$('v_'+k);if(e)e.textContent=T[k]}return T}
 const prev=()=>applyTheme(val());
-const ap=()=>{const o={};document.querySelectorAll('#sb [id^=s_]').forEach(e=>{const k=e.id.slice(2);if(!['domain','address','fp','prefix','title'].includes(k))o[k]=e.value});return o};
+const ap=()=>{const o={};document.querySelectorAll('#sb [id^=s_]').forEach(e=>{const k=e.id.slice(2);if(!['domain','address','fp','prefix','title','cands'].includes(k))o[k]=e.value});return o};
 function pre(k){$('s_accent').value=PRE[k][0];$('s_accent2').value=PRE[k][1];prev()}
 function look(k){const L={...LB,...LOOKS[k][1]};for(const x in L){const e=$('s_'+x);if(e)e.value=L[x]}prev();toast(LOOKS[k][0])}
 function imp(){const t=prompt('متن ظاهر رو اینجا بچسبون');if(!t)return;try{const o=JSON.parse(t);for(const k in o){const e=$('s_'+k);if(e)e.value=o[k]}prev();toast('✅ اعمال شد')}catch(e){toast('⚠️ متن معتبر نیست')}}
