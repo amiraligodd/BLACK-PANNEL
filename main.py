@@ -360,6 +360,11 @@ def stats():
             "ram_used": total - mem.get("MemAvailable", total), "ram_total": total,
             "load": os.getloadavg()[0], "xray": proc is not None and proc.poll() is None}
 
+@app.get("/ping")
+def ping():
+    return Response('{"ok":true,"svc":"vpanel"}', media_type="application/json",
+                    headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "no-store"})
+
 @app.get("/sub/{token}")
 def sub(token: str):
     with L:
