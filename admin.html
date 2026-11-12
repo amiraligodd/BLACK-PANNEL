@@ -150,6 +150,7 @@ input[type=range]{accent-color:var(--a);padding:0;margin-top:8px}
 <div class="w">
   <header>
     <h1 id="ttl">🛰️ پنل مدیریت</h1>
+    <button class="ic" onclick="openDiag()" title="عیب‌یابی">🩺</button>
     <button class="ic" onclick="openSet()" title="تنظیمات">⚙️</button>
     <button class="ic" onclick="location='/logout'" title="خروج">⏻</button>
   </header>
@@ -161,6 +162,7 @@ input[type=range]{accent-color:var(--a);padding:0;margin-top:8px}
     <div class="card st ani"><i>🖥️</i><small>رم / بار سرور</small><b id="s4" style="font-size:17px">–</b></div>
   </div>
 
+  <div id="errb" class="ats" style="margin-top:10px"></div>
   <div class="bar"><input id="q" placeholder="🔎 جستجوی کاربر یا یادداشت..." oninput="render()"></div>
   <div class="chips" id="chips"></div>
   <div id="list"></div>
@@ -174,6 +176,7 @@ input[type=range]{accent-color:var(--a);padding:0;margin-top:8px}
 <div class="mo" id="mq" onclick="if(event.target===this)cl('mq')"><div class="sh" id="mqb" style="text-align:center"></div></div>
 <div class="mo" id="ms" onclick="if(event.target===this)closeSet()"><div class="sh" id="sb"></div></div>
 <div class="mo" id="mc"><div class="sh" id="mcb"></div></div>
+<div class="mo" id="md" onclick="if(event.target===this)cl('md')"><div class="sh" id="mdb"></div></div>
 <div id="toast"></div>
 
 <script>
@@ -254,7 +257,7 @@ async function load(){
  [users,S]=await Promise.all([api('GET','/api/users'),api('GET','/api/settings')]);applyTheme();render();
  const s=await api('GET','/api/stats');
  $('s1').textContent=s.users;$('s2').textContent=s.active;$('s3').textContent=fb(s.traffic);
- $('s4').textContent=s.ram_total?Math.round(s.ram_used/s.ram_total*100)+'% · '+s.load.toFixed(2):'–'}
+ $('s4').textContent=s.ram_total?Math.round(s.ram_used/s.ram_total*100)+'% · '+s.load.toFixed(2):'–';const eb=$('errb');eb.className='ats'+(s.xray_err?' bad':'');eb.textContent=s.xray_err||''}
 
 const PROTOS=[['vmess','VMess','🔷','سازگار با اکثر اپ‌ها'],['vless','VLESS','⚡','پروتکل سبک و مدرن'],['trojan','Trojan','🛡️','شبیه ترافیک HTTPS'],['vlessh','VLESS-HU','🚀','انتقال HTTPUpgrade'],['reality','Reality','🎭','TCP مستقیم · نیاز به TCP Proxy']];
 const FPS=[['','پیش‌فرض'],['android','android'],['chrome','chrome'],['firefox','firefox'],['safari','safari'],['ios','ios'],['random','random']];
@@ -328,6 +331,14 @@ async function autoFind(id='fa',box='ats'){
  if(id==='s_address'){await api('PUT','/api/settings',{address:best.d});S.address=best.d;toast('✅ آدرس پیش‌فرض همه‌ی کانفیگ‌ها شد')}
  else if(editId){await api('PUT','/api/users/'+editId,{addr:best.d});toast('✅ روی کانفیگ اعمال شد');load()}
  else toast('✅ با ساخت کانفیگ اعمال می‌شه')}
+async function openDiag(){
+ $('mdb').innerHTML=`<div class="mh"><div class="mi">🩺</div><div><h3>عیب‌یابی</h3><small>وضعیت واقعی Xray و مسیرها</small></div><button class="x" onclick="cl('md')">✕</button></div><div id="dgb" class="ats run">⏳ در حال بررسی...</div>`;$('md').classList.add('on');
+ const d=await api('GET','/api/diag'),row=(ok,t)=>`<div class="rw"><span>${t}</span><span>${ok?'✅':'❌'}</span></div>`;
+ $('dgb').outerHTML=`<div class="sec">${row(d.alive,'Xray در حال اجرا')}${d.err?`<div class="ats bad">${esc(d.err)}</div>`:''}</div>
+ <div class="sec"><h4>پروتکل‌ها</h4>${d.protos.map(p=>`<div class="rw" style="font-size:13px"><span>${PN[p.p]} · پورت ${p.port}</span><span>${p.listen?'✅':'❌'} گوش‌می‌ده · کاربر در Xray ${p.in_xray}/${p.wanted} ${p.in_xray==p.wanted?'✅':'⚠️'}${p.pub?` · مسیر عمومی ${p.pub==='400'?'✅':'❌'} ${p.pub}`:''}</span></div>`).join('')}</div>
+ <div class="sec"><h4>پارامترهای لینک جدیدترین کاربر</h4><div class="lk" style="direction:ltr;white-space:pre-wrap">address: ${esc(d.addr)}\nSNI/Host: ${esc(d.dom)}\nport: ${d.port}${d.r_host?`\nreality: ${esc(d.r_host)}:${esc(d.r_port)}`:''}</div></div>
+ <div class="act stk"><button class="btn p" onclick="xr()">🔄 ری‌استارت Xray</button><button class="btn" onclick="openDiag()">بررسی دوباره</button></div>`}
+async function xr(){await api('POST','/api/xray/restart');toast('✅ Xray ری‌استارت شد');openDiag()}
 function ask(msg,ok='تأیید'){return new Promise(res=>{$('mcb').innerHTML=`<div class="mh"><div class="mi">❓</div><h3>${msg}</h3></div><div class="act"><button class="btn p" id="mc_y">${ok}</button><button class="btn" id="mc_n">انصراف</button></div>`;
  const f=v=>{cl('mc');res(v)};$('mc_y').onclick=()=>f(true);$('mc_n').onclick=()=>f(false);$('mc').onclick=e=>{if(e.target.id==='mc')f(false)};$('mc').classList.add('on')})}
 async function up(i,b){await api('PUT','/api/users/'+i,b);load()}
