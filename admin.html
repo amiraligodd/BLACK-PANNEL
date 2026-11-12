@@ -224,7 +224,7 @@ function fx(mode,col){const k=mode+col+(document.body.dataset.an||'');if(k===FXk
 addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{FXk='';applyTheme(window.__T||S)},300)});
 document.addEventListener('pointermove',e=>{const c=e.target.closest&&e.target.closest('.card');if(c){const r=c.getBoundingClientRect();c.style.setProperty('--mx',e.clientX-r.left+'px');c.style.setProperty('--my',e.clientY-r.top+'px')}});
 
-const PN={vmess:'VMess',vless:'VLESS',trojan:'Trojan',vlessh:'VLESS-HU'};
+const PN={vmess:'VMess',vless:'VLESS',trojan:'Trojan',vlessh:'VLESS-HU',reality:'Reality'};
 function render(){const an=!window._r;window._r=1;
  const q=$('q').value.trim().toLowerCase(),now=Date.now()/1000;
  const F={all:u=>1,active:u=>u.active,expired:u=>u.expire&&u.expire<now,off:u=>!u.enabled,full:u=>u.limit_bytes&&u.up+u.down>=u.limit_bytes};
@@ -256,7 +256,7 @@ async function load(){
  $('s1').textContent=s.users;$('s2').textContent=s.active;$('s3').textContent=fb(s.traffic);
  $('s4').textContent=s.ram_total?Math.round(s.ram_used/s.ram_total*100)+'% · '+s.load.toFixed(2):'–'}
 
-const PROTOS=[['vmess','VMess','🔷','سازگار با اکثر اپ‌ها'],['vless','VLESS','⚡','پروتکل سبک و مدرن'],['trojan','Trojan','🛡️','شبیه ترافیک HTTPS'],['vlessh','VLESS-HU','🚀','انتقال HTTPUpgrade']];
+const PROTOS=[['vmess','VMess','🔷','سازگار با اکثر اپ‌ها'],['vless','VLESS','⚡','پروتکل سبک و مدرن'],['trojan','Trojan','🛡️','شبیه ترافیک HTTPS'],['vlessh','VLESS-HU','🚀','انتقال HTTPUpgrade'],['reality','Reality','🎭','TCP مستقیم · نیاز به TCP Proxy']];
 const FPS=[['','پیش‌فرض'],['android','android'],['chrome','chrome'],['firefox','firefox'],['safari','safari'],['ios','ios'],['random','random']];
 const PORTS=[['443','443 TLS'],['80','80 بدون TLS'],['8443','8443'],['2053','2053'],['2096','2096']];
 const TPL=[['🧪','تست','۱ گیگ · ۱ روز',1,1],['📅','ماهانه','۵۰ گیگ · ۳۰ روز',50,30],['💎','سه‌ماهه','۱۵۰ گیگ · ۹۰ روز',150,90],['♾️','نامحدود','بدون حجم و زمان',0,0]];
@@ -269,7 +269,7 @@ const qc=(id,arr,suf)=>`<div class="chips wrap" style="margin-top:8px">${arr.map
 const swc=(g,on,t)=>`<div class="rw"><span>${t}</span><div class="sw2 ${on?'on':''}" data-g="${g}" data-v="1" onclick="tg(this)"><i></i></div></div>`;
 function sum(){if(!$('sum'))return;const gb=+$('fg').value||0,d=+$('fd').value||0,P=gv('proto'),first=gv('first').length,n=+($('fc')?$('fc').value:1)||1;
  const ex=d?(first?'⏳ '+d+' روز از اولین اتصال':new Date(Date.now()+d*864e5).toLocaleDateString('fa-IR')):'♾️ نامحدود';
- $('sum').innerHTML=`<div><b>${P.length}</b><small>پروتکل</small></div><div><b>${gb?gb+' GB':'♾️'}</b><small>حجم</small></div><div><b>${d?d+' روز':'♾️'}</b><small>مدت</small></div><div><b>${gv('port')[0]||443}</b><small>پورت</small></div><div class="wide"><small>انقضا: ${ex}${n>1?' · ساخت '+n+' کاربر':''}</small></div>`}
+ $('sum').innerHTML=`<div><b>${P.length}</b><small>پروتکل</small></div><div><b>${gb?gb+' GB':'♾️'}</b><small>حجم</small></div><div><b>${d?d+' روز':'♾️'}</b><small>مدت</small></div><div><b>${gv('port')[0]||443}</b><small>پورت</small></div><div class="wide"><small>انقضا: ${ex}${P.includes('reality')&&!S.r_host?' · ⚠️ آدرس TCP Proxy رو در ⚙️ وارد کن':''}${n>1?' · ساخت '+n+' کاربر':''}</small></div>`}
 function openUser(id){editId=id||null;const u=users.find(x=>x.id===id),E=!!u,ps=E?u.protos.split(','):['vmess'];
  const gb0=E?+(u.limit_bytes/GB).toFixed(2):0,d0=E&&u.expire?Math.max(0,Math.ceil((u.expire-Date.now()/1000)/86400)):0;
  $('mub').innerHTML=`<div class="mh"><div class="mi">${E?'✏️':'✨'}</div><div><h3>${E?'ویرایش کاربر':'ساخت کانفیگ جدید'}</h3><small>${E?esc(u.name):'همه‌چیز رو قبل از ساخت تنظیم کن'}</small></div><button class="x" onclick="cl('mu')">✕</button></div>
@@ -390,13 +390,16 @@ function openSet(){
  <label>آدرس اتصال (IP یا دامنه؛ خالی = آدرس پیش‌فرض کد)</label><div class="row"><input id="s_address" dir="ltr" value="${esc(S.address)}"><button class="btn" style="flex:0 0 88px" onclick="testAddr('s_address','ats2')">🧪 تست</button><button class="btn" style="flex:0 0 88px" onclick="autoFind('s_address','ats2')">🔎 خودکار</button></div><div id="ats2" class="ats"></div>
  <label>کاندیدهای تست خودکار (هر خط یک دامنه که به سرور تو می‌رسه)</label><textarea id="s_cands" dir="ltr" rows="3" placeholder="vpn.mydomain.com">${esc(S.cands||'')}</textarea>
  <div class="row"><div><label>Fingerprint</label><select id="s_fp">${['android','chrome','firefox','safari','ios','random'].map(x=>`<option>${x}</option>`).join('')}</select></div>
- <div><label>پیشوند نام کانفیگ</label><input id="s_prefix" value="${esc(S.prefix)}"></div></div></details>
+ <div><label>پیشوند نام کانفیگ</label><input id="s_prefix" value="${esc(S.prefix)}"></div></div>
+ <h4 style="margin:16px 0 2px">🎭 VLESS + Reality</h4><small style="color:var(--m)">در Railway ← Networking ← TCP Proxy با پورت داخلی 8443 بساز و دامنه و پورتش رو اینجا بنویس</small>
+ <label>آدرس TCP Proxy (دامنه یا IP)</label><input id="s_r_host" dir="ltr" value="${esc(S.r_host||'')}" placeholder="shuttle.proxy.rlwy.net">
+ <div class="row"><div><label>پورت TCP Proxy</label><input id="s_r_port" dir="ltr" value="${esc(S.r_port||'443')}"></div><div><label>سایت پوششی (dest)</label><input id="s_r_dest" dir="ltr" value="${esc(S.r_dest||'www.microsoft.com:443')}"></div></div></details>
  <div class="act stk"><button class="btn p" onclick="saveSet()">💾 ذخیره</button><button class="btn" onclick="resetSet()">پیش‌فرض ظاهر</button><button class="btn" onclick="closeSet()">بستن</button></div>`;
  for(const k in OPT)$('s_'+k).value=g(k);$('s_fp').value=S.fp;
  $('sb').oninput=prev;$('ms').classList.add('on')}
 function val(){const T={...S};document.querySelectorAll('#sb [id^=s_]').forEach(e=>T[e.id.slice(2)]=e.value);for(const k in RNG){const e=$('v_'+k);if(e)e.textContent=T[k]}return T}
 const prev=()=>applyTheme(val());
-const ap=()=>{const o={};document.querySelectorAll('#sb [id^=s_]').forEach(e=>{const k=e.id.slice(2);if(!['domain','address','fp','prefix','title','cands'].includes(k))o[k]=e.value});return o};
+const ap=()=>{const o={};document.querySelectorAll('#sb [id^=s_]').forEach(e=>{const k=e.id.slice(2);if(!['domain','address','fp','prefix','title','cands','r_host','r_port','r_dest'].includes(k))o[k]=e.value});return o};
 function pre(k){$('s_accent').value=PRE[k][0];$('s_accent2').value=PRE[k][1];prev()}
 function look(k){const L={...LB,...LOOKS[k][1]};for(const x in L){const e=$('s_'+x);if(e)e.value=L[x]}prev();toast(LOOKS[k][0])}
 function imp(){const t=prompt('متن ظاهر رو اینجا بچسبون');if(!t)return;try{const o=JSON.parse(t);for(const k in o){const e=$('s_'+k);if(e)e.value=o[k]}prev();toast('✅ اعمال شد')}catch(e){toast('⚠️ متن معتبر نیست')}}
