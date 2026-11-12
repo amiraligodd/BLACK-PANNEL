@@ -1,3 +1,5 @@
+import socket, ssl, re, urllib.request, urllib.error
+from concurrent.futures import ThreadPoolExecutor
 import os, json, time, uuid, secrets, base64, sqlite3, subprocess, threading, hmac, hashlib, urllib.parse, socket, ssl, ipaddress, random, re, urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
@@ -75,6 +77,38 @@ def is_active(u):
 # ---------- Xray management ----------
 proc = None
 current = None
+bad_ids = None   # آخرین مجموعه‌ی کاربری که تست کانفیگ Xray روش رد شد
+last_err = ""    # آخرین خطای Xray (در پنل نمایش داده می‌شه)
+cfg_warn = ""
+RESERVED = {int(os.environ.get("PORT", "0") or 0), 8000, 10000, 10001, 10002, 10003, 10085}
+
+def port_open(port, host="127.0.0.1"):
+    try:
+        socket.create_connection((host, port), 0.6).close()
+        return True
+    except OSError:
+        return False
+
+def xray_test(path):
+    """قبل از ری‌استارت کانفیگ رو تست می‌کنه تا یک کانفیگ خراب کل Xray رو از کار نندازه"""
+    try:
+        r = subprocess.run(["xray", "run", "-test", "-c", path], capture_output=True, text=True, timeout=20)
+        msg = (r.stdout + r.stderr).strip()[-400:]
+        if r.returncode != 0 and "not defined" in msg.lower():
+            return True, ""   # نسخه‌ی Xray فلگ -test رو نداره؛ تست رد می‌شه
+        return r.returncode == 0, msg
+    except Exception as e:
+        return True, ""       # xray پیدا نشد/تایم‌اوت: جلوی ری‌استارت رو نمی‌گیریم
+
+def wait_ready(ports, timeout=9):
+    end = time.time() + timeout
+    while time.time() < end:
+        if proc is None or proc.poll() is not None:
+            return False
+        if all(port_open(p) for p in ports):
+            return True
+        time.sleep(0.4)
+    return False
 
 PATHS = {"vmess": WS_PATH, "vless": "/vl", "trojan": "/tr", "vlessh": "/hu"}
 LABEL = {"vmess": "VMess", "vless": "VLESS", "trojan": "Trojan", "vlessh": "VLESS-HU"}
@@ -132,7 +166,9 @@ def clients_for(p, users, dummy=True):
             c["flow"] = "xtls-rprx-vision"
     return out
 
-def write_config(users):
+def write_config(users, path=None):
+    global cfg_warn
+    cfg_warn = ""
     inbounds = [{"tag": "api", "listen": "127.0.0.1", "port": 10085, "protocol": "dokodemo-door",
                  "settings": {"address": "127.0.0.1"}}]
     for p, (tag, port, proto, net) in INB.items():
@@ -143,6 +179,10 @@ def write_config(users):
         if net == "reality":
             rk = reality_keys()
             if not rk:
+                continue
+            if port in RESERVED:
+                cfg_warn = f"پورت Reality ({port}) با پورت دیگه‌ای تداخل داره (مثلاً PORT). متغیر REALITY_PORT رو عوض کن"
+                print("[xray] WARNING:", cfg_warn, flush=True)
                 continue
             dest = settings()["r_dest"]
             ss = {"network": "tcp", "security": "reality",
@@ -164,8 +204,9 @@ def write_config(users):
         "outbounds": [{"protocol": "freedom", "tag": "direct"}],
         "routing": {"rules": [{"type": "field", "inboundTag": ["api"], "outboundTag": "api"}]},
     }
-    with open(CONF, "w") as f:
+    with open(path or CONF, "w") as f:
         json.dump(cfg, f)
+    return [i["port"] for i in inbounds]
 
 API = "127.0.0.1:10085"
 # False = با هر تغییر کاربر، Xray ری‌استارت می‌شه (مطمئن‌تر: همه‌ی پروتکل‌ها همیشه همه‌ی کاربرها رو دارن)
@@ -176,7 +217,7 @@ def pairs(users):
 
 def sync():
     """Adding users/protocols is live (no disconnects). Removing restarts Xray so open connections are cut."""
-    global proc, current
+    global proc, current, bad_ids, last_err
     with L:
         users = [u for u in db.execute("SELECT * FROM users") if is_active(u)]
         ids = pairs(users)
@@ -206,16 +247,36 @@ def sync():
                     return
             except Exception as e:
                 print("live add failed, restarting:", e)
+        if ids == bad_ids:
+            return
+        new_conf = CONF + ".new"
+        ports = write_config(users, new_conf)
+        ok, msg = xray_test(new_conf)
+        if not ok:
+            bad_ids = ids
+            last_err = "کانفیگ Xray نامعتبره؛ تغییر اعمال نشد: " + msg
+            print("[xray] config test failed:", msg, flush=True)
+            return
         if alive:
             collect()  # save traffic counters before they reset
             proc.terminate()
             try: proc.wait(5)
             except Exception: proc.kill()
-        write_config(users)
-        proc = subprocess.Popen(["xray", "run", "-c", CONF])
+        os.replace(new_conf, CONF)
+        for attempt in (1, 2):
+            proc = subprocess.Popen(["xray", "run", "-c", CONF])
+            if wait_ready(ports):
+                break
+            print(f"[xray] not ready (attempt {attempt}, exit={proc.poll()})", flush=True)
+            if proc.poll() is None:
+                proc.terminate()
+                try: proc.wait(3)
+                except Exception: proc.kill()
+        ready = proc.poll() is None and all(port_open(p) for p in ports)
+        last_err = cfg_warn if ready else "Xray بالا نیومد؛ لاگ Railway رو ببین"
+        bad_ids = None
         current = ids
-        print("[xray] started, users per protocol:",
-              {p: sum(1 for i, q in ids if q == p) for p in INB}, flush=True)
+        print("[xray] started, ready=%s users per protocol: %s" % (ready, {p: sum(1 for i, q in ids if q == p) for p in INB}), flush=True)
 
 def collect():
     try:
@@ -331,6 +392,9 @@ def list_users():
 @app.post("/api/users", dependencies=[Depends(auth)])
 def add_user(n: NewUser):
     cnt = max(1, min(n.count, 200))
+    n.gb, n.days = max(0.0, n.gb), max(0, n.days)
+    n.port = n.port if 0 < n.port < 65536 else 443
+    n.addr = re.sub(r"^https?://", "", n.addr.strip()).split("/")[0]
     with L:
         for i in range(cnt):
             name = n.name.strip() or "user"
@@ -360,9 +424,9 @@ def edit_user(uid: int, e: EditUser):
         if e.note is not None: f["note"] = e.note
         if e.enabled is not None: f["enabled"] = int(e.enabled)
         if e.protos is not None: f["protos"] = clean_protos(e.protos)
-        if e.port is not None: f["port"] = e.port
+        if e.port is not None: f["port"] = e.port if 0 < e.port < 65536 else 443
         if e.fp is not None: f["fp"] = e.fp
-        if e.addr is not None: f["addr"] = e.addr.strip()
+        if e.addr is not None: f["addr"] = re.sub(r"^https?://", "", e.addr.strip()).split("/")[0]
         if e.gb is not None: f["limit_bytes"] = int(e.gb * GB)
         if e.days is not None:  # counted from now; 0 = unlimited
             f["expire"] = int(time.time() + e.days * 86400) if e.days else 0
@@ -397,7 +461,15 @@ def put_settings(body: dict):
     with L:
         for k, v in body.items():
             if k in DEFAULTS:
-                db.execute("INSERT OR REPLACE INTO settings(k,v) VALUES(?,?)", (k, str(v)[:2000]))
+                v = str(v).strip()
+                if k in ("domain", "address", "r_host"):
+                    v = re.sub(r"^https?://", "", v).split("/")[0]
+                if k == "r_dest":
+                    v = re.sub(r"^https?://", "", v).split("/")[0] or "www.microsoft.com:443"
+                    if ":" not in v: v += ":443"
+                if k == "r_port" and not v.isdigit():
+                    v = "443"
+                db.execute("INSERT OR REPLACE INTO settings(k,v) VALUES(?,?)", (k, v[:2000]))
         db.commit()
         if "r_dest" in body:
             current = None  # باعث ری‌استارت Xray با dest جدید می‌شه
@@ -419,7 +491,44 @@ def stats():
             "expired": sum(1 for u in us if u["expire"] and u["expire"] < time.time()),
             "traffic": sum(u["up"] + u["down"] for u in us),
             "ram_used": total - mem.get("MemAvailable", total), "ram_total": total,
-            "load": os.getloadavg()[0], "xray": proc is not None and proc.poll() is None}
+            "load": os.getloadavg()[0], "xray": proc is not None and proc.poll() is None, "xray_err": last_err}
+
+def probe(url):
+    try:
+        urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=6)
+        return "200"
+    except urllib.error.HTTPError as e:
+        return str(e.code)
+    except Exception:
+        return "خطا"
+
+@app.get("/api/diag", dependencies=[Depends(auth)])
+def diag():
+    st = settings()
+    dom = st["domain"] or DOMAIN
+    with L:
+        act = [u for u in db.execute("SELECT * FROM users") if is_active(u)]
+        last = db.execute("SELECT * FROM users ORDER BY id DESC LIMIT 1").fetchone()
+        cur = current or frozenset()
+    with ThreadPoolExecutor(5) as ex:
+        pubs = {p: ex.submit(probe, f"https://{dom}{PATHS[p]}") for p, v in INB.items() if v[3] != "reality"}
+        protos = [{"p": p, "port": v[1], "listen": port_open(v[1]),
+                   "in_xray": sum(1 for i, q in cur if q == p),
+                   "wanted": sum(1 for u in act if p in u["protos"].split(",")),
+                   "pub": pubs[p].result() if p in pubs else ""} for p, v in INB.items()]
+    addr = (last["addr"] if last else "") or st["address"] or DEFAULT_ADDRESS or dom
+    return {"alive": proc is not None and proc.poll() is None, "err": last_err, "protos": protos,
+            "addr": addr, "dom": dom, "port": last["port"] if last else 443,
+            "r_host": st["r_host"], "r_port": st["r_port"]}
+
+@app.post("/api/xray/restart", dependencies=[Depends(auth)])
+def xray_restart():
+    global current, bad_ids
+    with L:
+        current = None
+        bad_ids = None
+    sync()
+    return {"ok": True, "err": last_err}
 
 @app.get("/ping")
 def ping():
@@ -434,7 +543,7 @@ def sub(token: str):
         raise HTTPException(404)
     st = settings()
     h = {"subscription-userinfo": f"upload={u['up']}; download={u['down']}; total={u['limit_bytes']}; expire={u['expire']}",
-         "profile-update-interval": "1",
+         "profile-update-interval": "1", "Cache-Control": "no-store",
          "profile-title": "base64:" + base64.b64encode(st["title"].encode()).decode()}
     return Response(base64.b64encode("\n".join(l for _, l in links(u, st)).encode()), media_type="text/plain", headers=h)
 
@@ -453,6 +562,8 @@ def client_ip(request: Request):
 def login(body: dict, request: Request):
     ip, now = client_ip(request), time.time()
     n, t = fails.get(ip, (0, now))
+    if len(fails) > 500:
+        fails.clear()
     if now - t > 600:
         n, t = 0, now
     if n >= 5:
