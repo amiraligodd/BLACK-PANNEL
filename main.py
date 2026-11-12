@@ -249,7 +249,7 @@ def sync():
                 print("live add failed, restarting:", e)
         if ids == bad_ids:
             return
-        new_conf = CONF + ".new"
+        new_conf = os.path.join(DATA, "xray.new.json")  # پسوند باید .json باشه تا Xray فرمت رو تشخیص بده
         ports = write_config(users, new_conf)
         ok, msg = xray_test(new_conf)
         if not ok:
