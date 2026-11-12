@@ -46,7 +46,7 @@ DEFAULTS = {"title": "Black Panel", "accent": "#7c5cff", "theme": "dark", "radiu
             "density": "normal", "layout": "list", "anim": "1", "shape": "squircle",
             "pbar": "gradient", "cardstyle": "glass", "preset": "midnight",
             "palette": "default", "fx": "none", "noise": "0", "border": "normal", "hover": "lift", "spot": "1",
-            "titlefx": "gradient", "btn": "gradient", "enter": "fade", "glow": "40", "bgimg": "", "cands": ""}
+            "titlefx": "gradient", "btn": "gradient", "enter": "fade", "glow": "40", "bgimg": "", "cands": "", "r_host": "", "r_port": "443", "r_dest": "www.microsoft.com:443"}
 
 def settings():
     with L:
@@ -81,6 +81,39 @@ LABEL = {"vmess": "VMess", "vless": "VLESS", "trojan": "Trojan", "vlessh": "VLES
 # proto: (inbound tag, internal port, xray protocol, transport)
 INB = {"vmess": ("vmess-in", 10000, "vmess", "ws"), "vless": ("vless-in", 10001, "vless", "ws"),
        "trojan": ("trojan-in", 10002, "trojan", "ws"), "vlessh": ("vlessh-in", 10003, "vless", "httpupgrade")}
+REALITY_PORT = int(os.environ.get("REALITY_PORT", "8443"))  # پورت داخلی؛ همین رو در Railway ← TCP Proxy بده
+INB["reality"] = ("vlessr-in", REALITY_PORT, "vless", "reality")
+PATHS["reality"] = ""
+LABEL["reality"] = "Reality"
+_rk = None
+
+def reality_keys():
+    """کلید x25519 یک بار ساخته و در /data ذخیره می‌شه (بدون این‌ها Reality غیرفعاله)"""
+    global _rk
+    if _rk:
+        return _rk
+    path = os.path.join(DATA, "reality.json")
+    try:
+        with open(path) as f:
+            _rk = json.load(f)
+            return _rk
+    except Exception:
+        pass
+    try:
+        out = subprocess.run(["xray", "x25519"], capture_output=True, text=True, timeout=10).stdout
+        priv = pub = None
+        for ln in out.splitlines():
+            k, _, v = ln.partition(":")
+            if "rivate" in k: priv = v.strip()
+            elif "ublic" in k or "assword" in k: pub = v.strip()
+        if priv and pub:
+            _rk = {"private": priv, "public": pub, "sid": secrets.token_hex(4)}
+            with open(path, "w") as f:
+                json.dump(_rk, f)
+            return _rk
+    except Exception as e:
+        print("reality keys failed:", e, flush=True)
+    return None
 
 def clients_for(p, users, dummy=True):
     out = []
@@ -94,6 +127,9 @@ def clients_for(p, users, dummy=True):
     if not out and dummy:  # xray wants at least one client
         d = str(uuid.uuid4())
         out = [{"password": d, "email": "dummy"} if p == "trojan" else {"id": d, "email": "dummy"}]
+    if p == "reality":
+        for c in out:
+            c["flow"] = "xtls-rprx-vision"
     return out
 
 def write_config(users):
@@ -103,9 +139,21 @@ def write_config(users):
         st = {"clients": clients_for(p, users)}
         if proto == "vless":
             st["decryption"] = "none"
-        ss = ({"network": "ws", "wsSettings": {"path": PATHS[p]}} if net == "ws"
-              else {"network": "httpupgrade", "httpupgradeSettings": {"path": PATHS[p]}})
-        inbounds.append({"tag": tag, "listen": "127.0.0.1", "port": port, "protocol": proto,
+        listen = "127.0.0.1"
+        if net == "reality":
+            rk = reality_keys()
+            if not rk:
+                continue
+            dest = settings()["r_dest"]
+            ss = {"network": "tcp", "security": "reality",
+                  "realitySettings": {"show": False, "dest": dest, "xver": 0, "serverNames": [dest.split(":")[0]],
+                                      "privateKey": rk["private"], "shortIds": [rk["sid"]]}}
+            listen = "0.0.0.0"
+        elif net == "ws":
+            ss = {"network": "ws", "wsSettings": {"path": PATHS[p]}}
+        else:
+            ss = {"network": "httpupgrade", "httpupgradeSettings": {"path": PATHS[p]}}
+        inbounds.append({"tag": tag, "listen": listen, "port": port, "protocol": proto,
                          "settings": st, "streamSettings": ss})
     cfg = {
         "log": {"loglevel": "warning"},
@@ -246,6 +294,15 @@ def links(u, st=None, addr=None, only=None, label=""):
     for p in u["protos"].split(","):
         if p not in PATHS or (only and p not in only):
             continue
+        if p == "reality":
+            rh, rk = st["r_host"], reality_keys()
+            if not rh or not rk:
+                continue
+            q = {"encryption": "none", "flow": "xtls-rprx-vision", "security": "reality",
+                 "sni": st["r_dest"].split(":")[0], "fp": fp, "pbk": rk["public"], "sid": rk["sid"], "type": "tcp"}
+            tag = urllib.parse.quote(f"{name} {LABEL[p]}")
+            out.append((p, f"vless://{u['uuid']}@{rh}:{st['r_port']}?{urllib.parse.urlencode(q)}#{tag}"))
+            continue
         if p == "vmess":
             cfg = {"v": "2", "ps": f"{name} {LABEL[p]}", "add": addr, "port": str(port), "id": u["uuid"], "aid": "0",
                    "scy": "auto", "net": "ws", "type": "none", "host": dom, "path": PATHS[p],
@@ -336,11 +393,15 @@ def get_settings():
 
 @app.put("/api/settings", dependencies=[Depends(auth)])
 def put_settings(body: dict):
+    global current
     with L:
         for k, v in body.items():
             if k in DEFAULTS:
                 db.execute("INSERT OR REPLACE INTO settings(k,v) VALUES(?,?)", (k, str(v)[:2000]))
         db.commit()
+        if "r_dest" in body:
+            current = None  # باعث ری‌استارت Xray با dest جدید می‌شه
+    sync()
     return {"ok": True}
 
 @app.get("/api/stats", dependencies=[Depends(auth)])
