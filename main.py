@@ -1,16 +1,23 @@
-import socket, ssl, re, urllib.request, urllib.error
+Import socket, ssl, re, urllib.request, urllib.error
 from concurrent.futures import ThreadPoolExecutor
-import os, json, time, uuid, secrets, base64, sqlite3, subprocess, threading, hmac, hashlib, urllib.parse, ipaddress, random
+import os, json, time, uuid, secrets, base64, sqlite3, subprocess, threading, hmac, hashlib, urllib.parse, socket, ssl, ipaddress, random, re, urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Response, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
 ADMIN_USER = (os.environ.get("ADMIN_USER") or "admin").strip()
+# رمز پنل: بهتره در Railway ← Variables با اسم ADMIN_PASSWORD بذاری؛ اگه نبود از این مقدار استفاده می‌شه
 ADMIN_PASSWORD = (os.environ.get("ADMIN_PASSWORD") or "99842222").strip()
-RAILWAY_DOMAIN = os.environ.get("RAILWAY_DOMAIN", "pannel-black.up.railway.app")
+print(f"[panel] user={ADMIN_USER!r} password_length={len(ADMIN_PASSWORD)} source={'railway-variable' if os.environ.get('ADMIN_PASSWORD') else 'code'}", flush=True)
+# >>>>>>>>>> دامنه ریلوی خودتو اینجا بذار (بدون https://) <<<<<<<<<<
+RAILWAY_DOMAIN = "pannel-black.up.railway.app"
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 DOMAIN = os.environ.get("DOMAIN") or RAILWAY_DOMAIN
-DEFAULT_ADDRESS = os.environ.get("DEFAULT_ADDRESS", "up.railway.app")
+# آدرس اتصال پیش‌فرض: اگه برای کاربر یا در تنظیمات آدرسی مشخص نشده باشه، کانفیگ‌ها به این آدرس وصل می‌شن
+# (SNI و Host همچنان دامنه‌ی ریلوی خودته). خالی بذاری از خود دامنه استفاده می‌شه.
+DEFAULT_ADDRESS = "up.railway.app"
 WS_PATH = os.environ.get("WS_PATH", "/in2")
 DATA = os.environ.get("DATA_DIR", "/data")
 CONF = os.path.join(DATA, "xray.json")
@@ -35,13 +42,13 @@ for col in ("note TEXT DEFAULT ''", "created INTEGER DEFAULT 0", "protos TEXT DE
     except Exception: pass
 db.commit()
 
-DEFAULTS = {"title": "👑 KING_PANNEL", "accent": "#7c5cff", "theme": "dark", "radius": "16",
+DEFAULTS = {"title": "Black Panel", "accent": "#7c5cff", "theme": "dark", "radius": "16",
             "bg": "gradient", "domain": "", "address": "", "fp": "android", "prefix": "",
             "accent2": "#38d4ff", "font": "system", "fsize": "15", "blur": "14", "opacity": "40",
             "density": "normal", "layout": "list", "anim": "1", "shape": "squircle",
             "pbar": "gradient", "cardstyle": "glass", "preset": "midnight",
             "palette": "default", "fx": "none", "noise": "0", "border": "normal", "hover": "lift", "spot": "1",
-            "titlefx": "gradient", "btn": "gradient", "enter": "fade", "glow": "40", "bgimg": "", "cands": ""}
+            "titlefx": "gradient", "btn": "gradient", "enter": "fade", "glow": "40", "bgimg": "", "cands": "", "r_host": "", "r_port": "443", "r_dest": "www.microsoft.com:443"}
 
 def settings():
     with L:
@@ -52,7 +59,7 @@ def settings():
 app = FastAPI()
 
 def _tok():
-    return hmac.new(ADMIN_PASSWORD.encode(), b"king-panel-crypto-secure-token", hashlib.sha256).hexdigest()
+    return hmac.new(ADMIN_PASSWORD.encode(), b"panel-session", hashlib.sha256).hexdigest()
 
 def authed(request: Request):
     c = request.cookies.get("sess")
@@ -67,43 +74,80 @@ def is_active(u):
     return (u["enabled"] and (u["limit_bytes"] == 0 or u["up"] + u["down"] < u["limit_bytes"])
             and (u["expire"] == 0 or u["expire"] > now))
 
+# ---------- Xray management ----------
 proc = None
 current = None
-bad_ids = None
-last_err = ""
+bad_ids = None   # آخرین مجموعه‌ی کاربری که تست کانفیگ Xray روش رد شد
+last_err = ""    # آخرین خطای Xray (در پنل نمایش داده می‌شه)
 cfg_warn = ""
+RESERVED = {int(os.environ.get("PORT", "0") or 0), 8000, 10000, 10001, 10002, 10003, 10085}
 
 def port_open(port, host="127.0.0.1"):
     try:
-        socket.create_connection((host, port), 0.4).close()
+        socket.create_connection((host, port), 0.6).close()
         return True
     except OSError:
         return False
 
 def xray_test(path):
+    """قبل از ری‌استارت کانفیگ رو تست می‌کنه تا یک کانفیگ خراب کل Xray رو از کار نندازه"""
     try:
-        r = subprocess.run(["xray", "run", "-test", "-c", path], capture_output=True, text=True, timeout=10)
+        r = subprocess.run(["xray", "run", "-test", "-c", path], capture_output=True, text=True, timeout=20)
         msg = (r.stdout + r.stderr).strip()[-400:]
         if r.returncode != 0 and "not defined" in msg.lower():
-            return True, ""
+            return True, ""   # نسخه‌ی Xray فلگ -test رو نداره؛ تست رد می‌شه
         return r.returncode == 0, msg
-    except Exception:
-        return True, ""
+    except Exception as e:
+        return True, ""       # xray پیدا نشد/تایم‌اوت: جلوی ری‌استارت رو نمی‌گیریم
 
-def wait_ready(ports, timeout=7):
+def wait_ready(ports, timeout=9):
     end = time.time() + timeout
     while time.time() < end:
         if proc is None or proc.poll() is not None:
             return False
         if all(port_open(p) for p in ports):
             return True
-        time.sleep(0.2)
+        time.sleep(0.4)
     return False
 
 PATHS = {"vmess": WS_PATH, "vless": "/vl", "trojan": "/tr", "vlessh": "/hu"}
 LABEL = {"vmess": "VMess", "vless": "VLESS", "trojan": "Trojan", "vlessh": "VLESS-HU"}
+# proto: (inbound tag, internal port, xray protocol, transport)
 INB = {"vmess": ("vmess-in", 10000, "vmess", "ws"), "vless": ("vless-in", 10001, "vless", "ws"),
        "trojan": ("trojan-in", 10002, "trojan", "ws"), "vlessh": ("vlessh-in", 10003, "vless", "httpupgrade")}
+REALITY_PORT = int(os.environ.get("REALITY_PORT", "8443"))  # پورت داخلی؛ همین رو در Railway ← TCP Proxy بده
+INB["reality"] = ("vlessr-in", REALITY_PORT, "vless", "reality")
+PATHS["reality"] = ""
+LABEL["reality"] = "Reality"
+_rk = None
+
+def reality_keys():
+    """کلید x25519 یک بار ساخته و در /data ذخیره می‌شه (بدون این‌ها Reality غیرفعاله)"""
+    global _rk
+    if _rk:
+        return _rk
+    path = os.path.join(DATA, "reality.json")
+    try:
+        with open(path) as f:
+            _rk = json.load(f)
+            return _rk
+    except Exception:
+        pass
+    try:
+        out = subprocess.run(["xray", "x25519"], capture_output=True, text=True, timeout=10).stdout
+        priv = pub = None
+        for ln in out.splitlines():
+            k, _, v = ln.partition(":")
+            if "rivate" in k: priv = v.strip()
+            elif "ublic" in k or "assword" in k: pub = v.strip()
+        if priv and pub:
+            _rk = {"private": priv, "public": pub, "sid": secrets.token_hex(4)}
+            with open(path, "w") as f:
+                json.dump(_rk, f)
+            return _rk
+    except Exception as e:
+        print("reality keys failed:", e, flush=True)
+    return None
 
 def clients_for(p, users, dummy=True):
     out = []
@@ -114,9 +158,12 @@ def clients_for(p, users, dummy=True):
         if p == "vmess": out.append({"id": u["uuid"], "email": e, "alterId": 0})
         elif p == "trojan": out.append({"password": u["uuid"], "email": e})
         else: out.append({"id": u["uuid"], "email": e})
-    if not out and dummy:
+    if not out and dummy:  # xray wants at least one client
         d = str(uuid.uuid4())
         out = [{"password": d, "email": "dummy"} if p == "trojan" else {"id": d, "email": "dummy"}]
+    if p == "reality":
+        for c in out:
+            c["flow"] = "xtls-rprx-vision"
     return out
 
 def write_config(users, path=None):
@@ -129,7 +176,20 @@ def write_config(users, path=None):
         if proto == "vless":
             st["decryption"] = "none"
         listen = "127.0.0.1"
-        if net == "ws":
+        if net == "reality":
+            rk = reality_keys()
+            if not rk:
+                continue
+            if port in RESERVED:
+                cfg_warn = f"پورت Reality ({port}) با پورت دیگه‌ای تداخل داره (مثلاً PORT). متغیر REALITY_PORT رو عوض کن"
+                print("[xray] WARNING:", cfg_warn, flush=True)
+                continue
+            dest = settings()["r_dest"]
+            ss = {"network": "tcp", "security": "reality",
+                  "realitySettings": {"show": False, "dest": dest, "xver": 0, "serverNames": [dest.split(":")[0]],
+                                      "privateKey": rk["private"], "shortIds": [rk["sid"]]}}
+            listen = "0.0.0.0"
+        elif net == "ws":
             ss = {"network": "ws", "wsSettings": {"path": PATHS[p]}}
         else:
             ss = {"network": "httpupgrade", "httpupgradeSettings": {"path": PATHS[p]}}
@@ -149,11 +209,14 @@ def write_config(users, path=None):
     return [i["port"] for i in inbounds]
 
 API = "127.0.0.1:10085"
+# False = با هر تغییر کاربر، Xray ری‌استارت می‌شه (مطمئن‌تر: همه‌ی پروتکل‌ها همیشه همه‌ی کاربرها رو دارن)
+LIVE_ADD = False
 
 def pairs(users):
     return frozenset((u["id"], p) for u in users for p in u["protos"].split(",") if p in INB)
 
 def sync():
+    """Adding users/protocols is live (no disconnects). Removing restarts Xray so open connections are cut."""
     global proc, current, bad_ids, last_err
     with L:
         users = [u for u in db.execute("SELECT * FROM users") if is_active(u)]
@@ -161,34 +224,65 @@ def sync():
         alive = proc is not None and proc.poll() is None
         if alive and ids == current:
             return
+        if LIVE_ADD and alive and current is not None and current <= ids:
+            try:
+                by = {}
+                for u in users:
+                    for p in u["protos"].split(","):
+                        if p in INB and (u["id"], p) not in current:
+                            by.setdefault(p, []).append(u)
+                inb = []
+                for p, us in by.items():
+                    st = {"clients": clients_for(p, us, dummy=False)}
+                    if INB[p][2] == "vless":
+                        st["decryption"] = "none"
+                    inb.append({"tag": INB[p][0], "protocol": INB[p][2], "settings": st})
+                path = os.path.join(DATA, "adu.json")
+                with open(path, "w") as f:
+                    json.dump({"inbounds": inb}, f)
+                r = subprocess.run(["xray", "api", "adu", "-s", API, path], capture_output=True, text=True, timeout=10)
+                if r.returncode == 0:
+                    write_config(users)
+                    current = ids
+                    return
+            except Exception as e:
+                print("live add failed, restarting:", e)
         if ids == bad_ids:
             return
-        new_conf = os.path.join(DATA, "xray.new.json")
+        new_conf = os.path.join(DATA, "xray.new.json")  # پسوند باید .json باشه تا Xray فرمت رو تشخیص بده
         ports = write_config(users, new_conf)
         ok, msg = xray_test(new_conf)
         if not ok:
             bad_ids = ids
-            last_err = "خطا در کانفیگ Xray: " + msg
+            last_err = "کانفیگ Xray نامعتبره؛ تغییر اعمال نشد: " + msg
+            print("[xray] config test failed:", msg, flush=True)
             return
         if alive:
-            collect()
+            collect()  # save traffic counters before they reset
             proc.terminate()
-            try: proc.wait(3)
+            try: proc.wait(5)
             except Exception: proc.kill()
         os.replace(new_conf, CONF)
-        for _ in range(2):
+        for attempt in (1, 2):
             proc = subprocess.Popen(["xray", "run", "-c", CONF])
             if wait_ready(ports):
                 break
+            print(f"[xray] not ready (attempt {attempt}, exit={proc.poll()})", flush=True)
             if proc.poll() is None:
                 proc.terminate()
+                try: proc.wait(3)
+                except Exception: proc.kill()
+        ready = proc.poll() is None and all(port_open(p) for p in ports)
+        last_err = cfg_warn if ready else "Xray بالا نیومد؛ لاگ Railway رو ببین"
+        bad_ids = None
         current = ids
+        print("[xray] started, ready=%s users per protocol: %s" % (ready, {p: sum(1 for i, q in ids if q == p) for p in INB}), flush=True)
 
 def collect():
     try:
         out = subprocess.run(["xray", "api", "statsquery", "-s", "127.0.0.1:10085",
                               "-pattern", "user>>>", "-reset"],
-                             capture_output=True, text=True, timeout=5).stdout
+                             capture_output=True, text=True, timeout=10).stdout
         stats = json.loads(out).get("stat", []) if out.strip() else []
     except Exception:
         return
@@ -199,23 +293,25 @@ def collect():
                 continue
             col = "up" if p[3] == "uplink" else "down"
             db.execute(f"UPDATE users SET {col}={col}+? WHERE id=?", (int(s["value"]), int(p[1][1:])))
+        db.execute("UPDATE users SET expire=?+ttl_days*86400, ttl_days=0 WHERE ttl_days>0 AND expire=0 AND up+down>0", (int(time.time()),))
         db.commit()
 
 def loop():
-    time.sleep(2)
+    time.sleep(3)
     while True:
         try:
             collect()
             sync()
-        except Exception:
-            pass
-        time.sleep(8)
+        except Exception as e:
+            print("loop error:", e)
+        time.sleep(10)
 
 @app.on_event("startup")
 def start():
     sync()
     threading.Thread(target=loop, daemon=True).start()
 
+# ---------- API ----------
 def clean_protos(l):
     l = [p for p in (l or []) if p in PATHS]
     return ",".join(dict.fromkeys(l)) or "vmess"
@@ -258,6 +354,15 @@ def links(u, st=None, addr=None, only=None, label=""):
     out = []
     for p in u["protos"].split(","):
         if p not in PATHS or (only and p not in only):
+            continue
+        if p == "reality":
+            rh, rk = st["r_host"], reality_keys()
+            if not rh or not rk:
+                continue
+            q = {"encryption": "none", "flow": "xtls-rprx-vision", "security": "reality",
+                 "sni": st["r_dest"].split(":")[0], "fp": fp, "pbk": rk["public"], "sid": rk["sid"], "type": "tcp"}
+            tag = urllib.parse.quote(f"{name} {LABEL[p]}")
+            out.append((p, f"vless://{u['uuid']}@{rh}:{st['r_port']}?{urllib.parse.urlencode(q)}#{tag}"))
             continue
         if p == "vmess":
             cfg = {"v": "2", "ps": f"{name} {LABEL[p]}", "add": addr, "port": str(port), "id": u["uuid"], "aid": "0",
@@ -308,43 +413,6 @@ def add_user(n: NewUser):
     sync()
     return {"ok": True}
 
-# API اختصاصی برای ربات‌ها جهت ساخت کانفیگ داینامیک با دامنه و توکن مجزا
-@app.post("/api/bot/create")
-def bot_create_user(body: dict):
-    # احراز هویت از طریق توکن یا کلید API ارسالی از ربات
-    token = body.get("api_token") or body.get("token")
-    if not token or not hmac.compare_digest(str(token), ADMIN_PASSWORD):
-        raise HTTPException(status_code=403, detail="Invalid API Token")
-    
-    name = body.get("name", "bot-user")
-    gb = float(body.get("gb", 0))
-    days = int(body.get("days", 0))
-    protos = body.get("protos", ["vmess"])
-    
-    uid_ = str(uuid.uuid4())
-    user_token = secrets.token_urlsafe(12)
-    
-    with L:
-        db.execute("INSERT INTO users(name,uuid,token,limit_bytes,expire,note,created,protos,port,fp,addr,ttl_days,enabled) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                   (name, uid_, user_token, int(gb * GB),
-                    0 if not days else int(time.time() + days * 86400), body.get("note", "Created via Bot API"), int(time.time()),
-                    clean_protos(protos), 443, "", "", 0, 1))
-        db.commit()
-    sync()
-    
-    # تولید لینک‌ها بر اساس دامنه فعلی سرور (Railway)
-    st = settings()
-    u = db.execute("SELECT * FROM users WHERE uuid=?", (uid_,)).fetchone()
-    generated_links = [{"p": p, "l": l} for p, l in links(u, st)]
-    
-    return {
-        "ok": True,
-        "name": name,
-        "uuid": uid_,
-        "sub_link": f"https://{st['domain'] or DOMAIN}/sub/{user_token}",
-        "links": generated_links
-    }
-
 @app.put("/api/users/{uid}", dependencies=[Depends(auth)])
 def edit_user(uid: int, e: EditUser):
     with L:
@@ -360,7 +428,7 @@ def edit_user(uid: int, e: EditUser):
         if e.fp is not None: f["fp"] = e.fp
         if e.addr is not None: f["addr"] = re.sub(r"^https?://", "", e.addr.strip()).split("/")[0]
         if e.gb is not None: f["limit_bytes"] = int(e.gb * GB)
-        if e.days is not None:
+        if e.days is not None:  # counted from now; 0 = unlimited
             f["expire"] = int(time.time() + e.days * 86400) if e.days else 0
             f["ttl_days"] = 0
         if e.add_gb:
@@ -389,14 +457,22 @@ def get_settings():
 
 @app.put("/api/settings", dependencies=[Depends(auth)])
 def put_settings(body: dict):
+    global current
     with L:
         for k, v in body.items():
             if k in DEFAULTS:
                 v = str(v).strip()
-                if k in ("domain", "address"):
+                if k in ("domain", "address", "r_host"):
                     v = re.sub(r"^https?://", "", v).split("/")[0]
+                if k == "r_dest":
+                    v = re.sub(r"^https?://", "", v).split("/")[0] or "www.microsoft.com:443"
+                    if ":" not in v: v += ":443"
+                if k == "r_port" and not v.isdigit():
+                    v = "443"
                 db.execute("INSERT OR REPLACE INTO settings(k,v) VALUES(?,?)", (k, v[:2000]))
         db.commit()
+        if "r_dest" in body:
+            current = None  # باعث ری‌استارت Xray با dest جدید می‌شه
     sync()
     return {"ok": True}
 
@@ -417,6 +493,15 @@ def stats():
             "ram_used": total - mem.get("MemAvailable", total), "ram_total": total,
             "load": os.getloadavg()[0], "xray": proc is not None and proc.poll() is None, "xray_err": last_err}
 
+def probe(url):
+    try:
+        urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=6)
+        return "200"
+    except urllib.error.HTTPError as e:
+        return str(e.code)
+    except Exception:
+        return "خطا"
+
 @app.get("/api/diag", dependencies=[Depends(auth)])
 def diag():
     st = settings()
@@ -425,12 +510,16 @@ def diag():
         act = [u for u in db.execute("SELECT * FROM users") if is_active(u)]
         last = db.execute("SELECT * FROM users ORDER BY id DESC LIMIT 1").fetchone()
         cur = current or frozenset()
-    protos = [{"p": p, "port": v[1], "listen": port_open(v[1]),
-               "in_xray": sum(1 for i, q in cur if q == p),
-               "wanted": sum(1 for u in act if p in u["protos"].split(","))} for p, v in INB.items()]
+    with ThreadPoolExecutor(5) as ex:
+        pubs = {p: ex.submit(probe, f"https://{dom}{PATHS[p]}") for p, v in INB.items() if v[3] != "reality"}
+        protos = [{"p": p, "port": v[1], "listen": port_open(v[1]),
+                   "in_xray": sum(1 for i, q in cur if q == p),
+                   "wanted": sum(1 for u in act if p in u["protos"].split(",")),
+                   "pub": pubs[p].result() if p in pubs else ""} for p, v in INB.items()]
     addr = (last["addr"] if last else "") or st["address"] or DEFAULT_ADDRESS or dom
     return {"alive": proc is not None and proc.poll() is None, "err": last_err, "protos": protos,
-            "addr": addr, "dom": dom, "port": last["port"] if last else 443}
+            "addr": addr, "dom": dom, "port": last["port"] if last else 443,
+            "r_host": st["r_host"], "r_port": st["r_port"]}
 
 @app.post("/api/xray/restart", dependencies=[Depends(auth)])
 def xray_restart():
@@ -483,7 +572,7 @@ def login(body: dict, request: Request):
           and secrets.compare_digest(str(body.get("password", "")).strip().encode(), ADMIN_PASSWORD.encode()))
     if not ok:
         fails[ip] = (n + 1, t)
-        time.sleep(1.0)
+        time.sleep(1.2)
         raise HTTPException(401)
     fails.pop(ip, None)
     r = Response('{"ok":true}', media_type="application/json")
@@ -514,7 +603,7 @@ def admin(request: Request):
     return open(os.path.join(HERE, "admin.html"), encoding="utf-8").read()
 
 LOGIN = """<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>ورود به KING_PANNEL</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>ورود</title>
 <style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,Tahoma,sans-serif;
 background:radial-gradient(900px 500px at 80% -10%,color-mix(in srgb,var(--a,#7c5cff) 70%,#000) 0,transparent 60%),radial-gradient(700px 500px at 0 110%,#0f6e8c 0,transparent 55%),#0a0c13;color:#eef0f8}
 .b{width:min(360px,92vw);padding:28px;border-radius:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(18px)}
@@ -522,9 +611,10 @@ h2{margin:0 0 4px}.b{animation:fu .6s both}@keyframes fu{from{opacity:0;transfor
 input{width:100%;padding:13px 14px;margin:6px 0;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.3);color:#fff;font-size:15px}
 button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;background:linear-gradient(135deg,var(--a,#7c5cff),var(--a2,#5b8cff));color:#fff;font-size:16px;font-weight:700}
 #e{color:#ff6b7a;font-size:13px;min-height:18px;margin-top:8px}</style></head><body>
-<form class="b" onsubmit="go(event)"><h2>👑 KING_PANNEL</h2><p>سیستم مدیریت رمزنگاری‌شده</p>
+<form class="b" onsubmit="go(event)"><h2>🔐 ورود به پنل</h2><p>اطلاعات مدیر را وارد کنید</p>
 <input id="u" placeholder="نام کاربری" autocomplete="username" autocapitalize="none"><input id="p" type="password" placeholder="رمز عبور" autocomplete="current-password"><label style="font-size:13px;color:#9aa3bd;display:block;margin-top:4px"><input type="checkbox" style="width:auto;margin:6px" onchange="p.type=this.checked?'text':'password'">نمایش رمز</label>
-<button>ورود به سیستم</button><div id="e"></div></form>
+<button>ورود</button><div id="e"></div></form>
 <script>async function go(ev){ev.preventDefault();const r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({username:u.value,password:p.value})});if(r.ok)location='/admin';else e.textContent=r.status==429?'تلاش بیش از حد':'نام کاربری یا رمز اشتباه است'}
-fetch('/api/theme').then(r=>r.json()).then(t=>{const s=document.documentElement.style;s.setProperty('--a',t.accent);s.setProperty('--a2',t.accent2);document.title=t.title;document.querySelector('h2').textContent='👑 '+t.title})</script></body></html>"""
+body:JSON.stringify({username:u.value,password:p.value})});if(r.ok)location='/admin';else e.textContent=r.status==429?'تلاش بیش از حد؛ ۱۰ دقیقه صبر کنید':r.status==401?'نام کاربری یا رمز اشتباه است':'خطای سرور (کد '+r.status+')'}
+fetch('/api/theme').then(r=>r.json()).then(t=>{const s=document.documentElement.style;s.setProperty('--a',t.accent);s.setProperty('--a2',t.accent2);document.title=t.title;document.querySelector('h2').textContent='🔐 '+t.title})</script></body></html>"""
+
