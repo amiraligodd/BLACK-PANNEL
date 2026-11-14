@@ -1,4 +1,4 @@
-Import socket, ssl, re, urllib.request, urllib.error
+import socket, ssl, re, urllib.request, urllib.error
 from concurrent.futures import ThreadPoolExecutor
 import os, json, time, uuid, secrets, base64, sqlite3, subprocess, threading, hmac, hashlib, urllib.parse, socket, ssl, ipaddress, random, re, urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -12,12 +12,12 @@ ADMIN_USER = (os.environ.get("ADMIN_USER") or "admin").strip()
 ADMIN_PASSWORD = (os.environ.get("ADMIN_PASSWORD") or "99842222").strip()
 print(f"[panel] user={ADMIN_USER!r} password_length={len(ADMIN_PASSWORD)} source={'railway-variable' if os.environ.get('ADMIN_PASSWORD') else 'code'}", flush=True)
 # >>>>>>>>>> دامنه ریلوی خودتو اینجا بذار (بدون https://) <<<<<<<<<<
-RAILWAY_DOMAIN = "pannel-black.up.railway.app"
+RAILWAY_DOMAIN = "YOUR-DOMAIN.up.railway.app"
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 DOMAIN = os.environ.get("DOMAIN") or RAILWAY_DOMAIN
 # آدرس اتصال پیش‌فرض: اگه برای کاربر یا در تنظیمات آدرسی مشخص نشده باشه، کانفیگ‌ها به این آدرس وصل می‌شن
 # (SNI و Host همچنان دامنه‌ی ریلوی خودته). خالی بذاری از خود دامنه استفاده می‌شه.
-DEFAULT_ADDRESS = "up.railway.app"
+DEFAULT_ADDRESS = ""
 WS_PATH = os.environ.get("WS_PATH", "/in2")
 DATA = os.environ.get("DATA_DIR", "/data")
 CONF = os.path.join(DATA, "xray.json")
@@ -80,6 +80,7 @@ current = None
 bad_ids = None   # آخرین مجموعه‌ی کاربری که تست کانفیگ Xray روش رد شد
 last_err = ""    # آخرین خطای Xray (در پنل نمایش داده می‌شه)
 cfg_warn = ""
+R_LISTEN = "::"   # dual-stack (IPv4+IPv6)؛ اگه کانتینر IPv6 نداشت خودکار به 0.0.0.0 برمی‌گرده
 RESERVED = {int(os.environ.get("PORT", "0") or 0), 8000, 10000, 10001, 10002, 10003, 10085}
 
 def port_open(port, host="127.0.0.1"):
@@ -115,7 +116,11 @@ LABEL = {"vmess": "VMess", "vless": "VLESS", "trojan": "Trojan", "vlessh": "VLES
 # proto: (inbound tag, internal port, xray protocol, transport)
 INB = {"vmess": ("vmess-in", 10000, "vmess", "ws"), "vless": ("vless-in", 10001, "vless", "ws"),
        "trojan": ("trojan-in", 10002, "trojan", "ws"), "vlessh": ("vlessh-in", 10003, "vless", "httpupgrade")}
-REALITY_PORT = int(os.environ.get("REALITY_PORT", "8443"))  # پورت داخلی؛ همین رو در Railway ← TCP Proxy بده
+REALITY_WANTED = int(os.environ.get("REALITY_PORT", "8443") or 8443)
+REALITY_PORT = REALITY_WANTED
+while REALITY_PORT in RESERVED:   # با پورت دامنه (PORT) و پورت‌های داخلی تداخل نکنه
+    REALITY_PORT += 1
+REALITY_NOTE = "" if REALITY_PORT == REALITY_WANTED else f"پورت Reality به {REALITY_PORT} تغییر کرد (چون {REALITY_WANTED} با PORT تداخل داره). در Railway ← TCP Proxy پورت داخلی رو {REALITY_PORT} بذار"
 INB["reality"] = ("vlessr-in", REALITY_PORT, "vless", "reality")
 PATHS["reality"] = ""
 LABEL["reality"] = "Reality"
@@ -179,16 +184,14 @@ def write_config(users, path=None):
         if net == "reality":
             rk = reality_keys()
             if not rk:
+                cfg_warn = "کلید Reality ساخته نشد؛ Reality غیرفعاله (در لاگ دنبال reality keys failed بگرد)"
                 continue
-            if port in RESERVED:
-                cfg_warn = f"پورت Reality ({port}) با پورت دیگه‌ای تداخل داره (مثلاً PORT). متغیر REALITY_PORT رو عوض کن"
-                print("[xray] WARNING:", cfg_warn, flush=True)
-                continue
+            cfg_warn = REALITY_NOTE
             dest = settings()["r_dest"]
             ss = {"network": "tcp", "security": "reality",
                   "realitySettings": {"show": False, "dest": dest, "xver": 0, "serverNames": [dest.split(":")[0]],
                                       "privateKey": rk["private"], "shortIds": [rk["sid"]]}}
-            listen = "0.0.0.0"
+            listen = R_LISTEN
         elif net == "ws":
             ss = {"network": "ws", "wsSettings": {"path": PATHS[p]}}
         else:
@@ -217,7 +220,7 @@ def pairs(users):
 
 def sync():
     """Adding users/protocols is live (no disconnects). Removing restarts Xray so open connections are cut."""
-    global proc, current, bad_ids, last_err
+    global proc, current, bad_ids, last_err, R_LISTEN
     with L:
         users = [u for u in db.execute("SELECT * FROM users") if is_active(u)]
         ids = pairs(users)
@@ -272,11 +275,15 @@ def sync():
                 proc.terminate()
                 try: proc.wait(3)
                 except Exception: proc.kill()
-        ready = proc.poll() is None and all(port_open(p) for p in ports)
-        last_err = cfg_warn if ready else "Xray بالا نیومد؛ لاگ Railway رو ببین"
+            if attempt == 1:  # شاید bind روی :: ممکن نبود؛ با آدرس دیگه دوباره امتحان می‌کنیم
+                R_LISTEN = "0.0.0.0" if R_LISTEN == "::" else "::"
+                ports = write_config(users)
+        closed = [p for p in ports if not port_open(p)]
+        ready = proc.poll() is None and not closed
+        last_err = cfg_warn if ready else f"Xray بالا نیومد؛ پورت‌های باز نشده: {closed or '—'}؛ لاگ Railway رو ببین"
         bad_ids = None
         current = ids
-        print("[xray] started, ready=%s users per protocol: %s" % (ready, {p: sum(1 for i, q in ids if q == p) for p in INB}), flush=True)
+        print("[xray] started, ready=%s reality=%s:%s users per protocol: %s" % (ready, R_LISTEN, REALITY_PORT, {p: sum(1 for i, q in ids if q == p) for p in INB}), flush=True)
 
 def collect():
     try:
@@ -360,7 +367,7 @@ def links(u, st=None, addr=None, only=None, label=""):
             if not rh or not rk:
                 continue
             q = {"encryption": "none", "flow": "xtls-rprx-vision", "security": "reality",
-                 "sni": st["r_dest"].split(":")[0], "fp": fp, "pbk": rk["public"], "sid": rk["sid"], "type": "tcp"}
+                 "sni": st["r_dest"].split(":")[0], "fp": u["fp"] or "chrome", "headerType": "none", "pbk": rk["public"], "sid": rk["sid"], "type": "tcp"}
             tag = urllib.parse.quote(f"{name} {LABEL[p]}")
             out.append((p, f"vless://{u['uuid']}@{rh}:{st['r_port']}?{urllib.parse.urlencode(q)}#{tag}"))
             continue
@@ -453,7 +460,7 @@ def del_user(uid: int):
 
 @app.get("/api/settings", dependencies=[Depends(auth)])
 def get_settings():
-    return dict(settings(), default_domain=DOMAIN, ws_path=WS_PATH)
+    return dict(settings(), default_domain=DOMAIN, ws_path=WS_PATH, reality_port=REALITY_PORT)
 
 @app.put("/api/settings", dependencies=[Depends(auth)])
 def put_settings(body: dict):
@@ -492,43 +499,6 @@ def stats():
             "traffic": sum(u["up"] + u["down"] for u in us),
             "ram_used": total - mem.get("MemAvailable", total), "ram_total": total,
             "load": os.getloadavg()[0], "xray": proc is not None and proc.poll() is None, "xray_err": last_err}
-
-def probe(url):
-    try:
-        urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=6)
-        return "200"
-    except urllib.error.HTTPError as e:
-        return str(e.code)
-    except Exception:
-        return "خطا"
-
-@app.get("/api/diag", dependencies=[Depends(auth)])
-def diag():
-    st = settings()
-    dom = st["domain"] or DOMAIN
-    with L:
-        act = [u for u in db.execute("SELECT * FROM users") if is_active(u)]
-        last = db.execute("SELECT * FROM users ORDER BY id DESC LIMIT 1").fetchone()
-        cur = current or frozenset()
-    with ThreadPoolExecutor(5) as ex:
-        pubs = {p: ex.submit(probe, f"https://{dom}{PATHS[p]}") for p, v in INB.items() if v[3] != "reality"}
-        protos = [{"p": p, "port": v[1], "listen": port_open(v[1]),
-                   "in_xray": sum(1 for i, q in cur if q == p),
-                   "wanted": sum(1 for u in act if p in u["protos"].split(",")),
-                   "pub": pubs[p].result() if p in pubs else ""} for p, v in INB.items()]
-    addr = (last["addr"] if last else "") or st["address"] or DEFAULT_ADDRESS or dom
-    return {"alive": proc is not None and proc.poll() is None, "err": last_err, "protos": protos,
-            "addr": addr, "dom": dom, "port": last["port"] if last else 443,
-            "r_host": st["r_host"], "r_port": st["r_port"]}
-
-@app.post("/api/xray/restart", dependencies=[Depends(auth)])
-def xray_restart():
-    global current, bad_ids
-    with L:
-        current = None
-        bad_ids = None
-    sync()
-    return {"ok": True, "err": last_err}
 
 @app.get("/ping")
 def ping():
