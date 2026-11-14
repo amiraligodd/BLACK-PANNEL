@@ -8,9 +8,9 @@ from pydantic import BaseModel
 
 ADMIN_USER = (os.environ.get("ADMIN_USER") or "admin").strip()
 ADMIN_PASSWORD = (os.environ.get("ADMIN_PASSWORD") or "99842222").strip()
-RAILWAY_DOMAIN = "pannel-black.up.railway.app"
+RAILWAY_DOMAIN = os.environ.get("RAILWAY_DOMAIN", "pannel-black.up.railway.app")
 DOMAIN = os.environ.get("DOMAIN") or RAILWAY_DOMAIN
-DEFAULT_ADDRESS = "up.railway.app"
+DEFAULT_ADDRESS = os.environ.get("DEFAULT_ADDRESS", "up.railway.app")
 WS_PATH = os.environ.get("WS_PATH", "/in2")
 DATA = os.environ.get("DATA_DIR", "/data")
 CONF = os.path.join(DATA, "xray.json")
@@ -35,7 +35,7 @@ for col in ("note TEXT DEFAULT ''", "created INTEGER DEFAULT 0", "protos TEXT DE
     except Exception: pass
 db.commit()
 
-DEFAULTS = {"title": "KING_PANNEL", "accent": "#7c5cff", "theme": "dark", "radius": "16",
+DEFAULTS = {"title": "👑 KING_PANNEL", "accent": "#7c5cff", "theme": "dark", "radius": "16",
             "bg": "gradient", "domain": "", "address": "", "fp": "android", "prefix": "",
             "accent2": "#38d4ff", "font": "system", "fsize": "15", "blur": "14", "opacity": "40",
             "density": "normal", "layout": "list", "anim": "1", "shape": "squircle",
@@ -52,7 +52,7 @@ def settings():
 app = FastAPI()
 
 def _tok():
-    return hmac.new(ADMIN_PASSWORD.encode(), b"king-panel-secure-token", hashlib.sha256).hexdigest()
+    return hmac.new(ADMIN_PASSWORD.encode(), b"king-panel-crypto-secure-token", hashlib.sha256).hexdigest()
 
 def authed(request: Request):
     c = request.cookies.get("sess")
@@ -72,7 +72,6 @@ current = None
 bad_ids = None
 last_err = ""
 cfg_warn = ""
-RESERVED = {int(os.environ.get("PORT", "0") or 0), 8000, 10000, 10001, 10002, 10003, 10085}
 
 def port_open(port, host="127.0.0.1"):
     try:
@@ -309,6 +308,43 @@ def add_user(n: NewUser):
     sync()
     return {"ok": True}
 
+# API اختصاصی برای ربات‌ها جهت ساخت کانفیگ داینامیک با دامنه و توکن مجزا
+@app.post("/api/bot/create")
+def bot_create_user(body: dict):
+    # احراز هویت از طریق توکن یا کلید API ارسالی از ربات
+    token = body.get("api_token") or body.get("token")
+    if not token or not hmac.compare_digest(str(token), ADMIN_PASSWORD):
+        raise HTTPException(status_code=403, detail="Invalid API Token")
+    
+    name = body.get("name", "bot-user")
+    gb = float(body.get("gb", 0))
+    days = int(body.get("days", 0))
+    protos = body.get("protos", ["vmess"])
+    
+    uid_ = str(uuid.uuid4())
+    user_token = secrets.token_urlsafe(12)
+    
+    with L:
+        db.execute("INSERT INTO users(name,uuid,token,limit_bytes,expire,note,created,protos,port,fp,addr,ttl_days,enabled) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                   (name, uid_, user_token, int(gb * GB),
+                    0 if not days else int(time.time() + days * 86400), body.get("note", "Created via Bot API"), int(time.time()),
+                    clean_protos(protos), 443, "", "", 0, 1))
+        db.commit()
+    sync()
+    
+    # تولید لینک‌ها بر اساس دامنه فعلی سرور (Railway)
+    st = settings()
+    u = db.execute("SELECT * FROM users WHERE uuid=?", (uid_,)).fetchone()
+    generated_links = [{"p": p, "l": l} for p, l in links(u, st)]
+    
+    return {
+        "ok": True,
+        "name": name,
+        "uuid": uid_,
+        "sub_link": f"https://{st['domain'] or DOMAIN}/sub/{user_token}",
+        "links": generated_links
+    }
+
 @app.put("/api/users/{uid}", dependencies=[Depends(auth)])
 def edit_user(uid: int, e: EditUser):
     with L:
@@ -355,7 +391,7 @@ def get_settings():
 def put_settings(body: dict):
     with L:
         for k, v in body.items():
-            if k in DEFAULTS and k != "title":
+            if k in DEFAULTS:
                 v = str(v).strip()
                 if k in ("domain", "address"):
                     v = re.sub(r"^https?://", "", v).split("/")[0]
@@ -380,13 +416,6 @@ def stats():
             "traffic": sum(u["up"] + u["down"] for u in us),
             "ram_used": total - mem.get("MemAvailable", total), "ram_total": total,
             "load": os.getloadavg()[0], "xray": proc is not None and proc.poll() is None, "xray_err": last_err}
-
-def probe(url):
-    try:
-        urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=5)
-        return "200"
-    except Exception:
-        return "خطا"
 
 @app.get("/api/diag", dependencies=[Depends(auth)])
 def diag():
@@ -493,9 +522,9 @@ h2{margin:0 0 4px}.b{animation:fu .6s both}@keyframes fu{from{opacity:0;transfor
 input{width:100%;padding:13px 14px;margin:6px 0;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.3);color:#fff;font-size:15px}
 button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;background:linear-gradient(135deg,var(--a,#7c5cff),var(--a2,#5b8cff));color:#fff;font-size:16px;font-weight:700}
 #e{color:#ff6b7a;font-size:13px;min-height:18px;margin-top:8px}</style></head><body>
-<form class="b" onsubmit="go(event)"><h2>👑 KING_PANNEL</h2><p>احراز هویت امنیتی رمزنگاری‌شده</p>
+<form class="b" onsubmit="go(event)"><h2>👑 KING_PANNEL</h2><p>سیستم مدیریت رمزنگاری‌شده</p>
 <input id="u" placeholder="نام کاربری" autocomplete="username" autocapitalize="none"><input id="p" type="password" placeholder="رمز عبور" autocomplete="current-password"><label style="font-size:13px;color:#9aa3bd;display:block;margin-top:4px"><input type="checkbox" style="width:auto;margin:6px" onchange="p.type=this.checked?'text':'password'">نمایش رمز</label>
 <button>ورود به سیستم</button><div id="e"></div></form>
 <script>async function go(ev){ev.preventDefault();const r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({username:u.value,password:p.value})});if(r.ok)location='/admin';else e.textContent=r.status==429?'تلاش بیش از حد؛ ۱۰ دقیقه مسدود':r.status==401?'نام کاربری یا رمز اشتباه است':'خطای سرور'}
+body:JSON.stringify({username:u.value,password:p.value})});if(r.ok)location='/admin';else e.textContent=r.status==429?'تلاش بیش از حد':'نام کاربری یا رمز اشتباه است'}
 fetch('/api/theme').then(r=>r.json()).then(t=>{const s=document.documentElement.style;s.setProperty('--a',t.accent);s.setProperty('--a2',t.accent2);document.title=t.title;document.querySelector('h2').textContent='👑 '+t.title})</script></body></html>"""
