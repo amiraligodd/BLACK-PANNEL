@@ -355,7 +355,7 @@ def get_settings():
 def put_settings(body: dict):
     with L:
         for k, v in body.items():
-            if k in DEFAULTS and k != "title": # قفل شدن تغییر نام پنل برای امنیت بیشتر
+            if k in DEFAULTS and k != "title":
                 v = str(v).strip()
                 if k in ("domain", "address"):
                     v = re.sub(r"^https?://", "", v).split("/")[0]
@@ -380,6 +380,13 @@ def stats():
             "traffic": sum(u["up"] + u["down"] for u in us),
             "ram_used": total - mem.get("MemAvailable", total), "ram_total": total,
             "load": os.getloadavg()[0], "xray": proc is not None and proc.poll() is None, "xray_err": last_err}
+
+def probe(url):
+    try:
+        urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=5)
+        return "200"
+    except Exception:
+        return "خطا"
 
 @app.get("/api/diag", dependencies=[Depends(auth)])
 def diag():
