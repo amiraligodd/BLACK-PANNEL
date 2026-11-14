@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>KING_PANNEL</title>
+<title>پنل مدیریت</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root{--a:#7c5cff;--a2:#38d4ff;--r:16px;--fs:15px;--bl:14px;--pad:14px;--avr:13px}
@@ -54,25 +54,69 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--a);outline-offse
 .btn{flex:1;min-width:64px;padding:9px 6px;border-radius:11px;border:1px solid var(--b);background:var(--c2);color:var(--t);font-size:13px;cursor:pointer;font-family:inherit}
 .btn.p{background:linear-gradient(135deg,var(--a),var(--a2));border-color:transparent;color:#fff;font-weight:700}
 .btn.d{color:#ff7a80}
-.fab{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:18px;height:56px;padding:0 22px;border-radius:99px;border:0;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 10px 30px color-mix(in srgb,var(--a) 55%,transparent)}
+.fab{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:18px;height:56px;padding:0 22px;border-radius:99px;border:0;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-size:16px;font-weight:800;box-shadow:0 10px 30px color-mix(in srgb,var(--a) 55%,transparent);cursor:pointer}
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:20;backdrop-filter:blur(4px)}
 .mo.on{display:flex}
 .sh{width:min(520px,100%);max-height:92vh;overflow:auto;background:var(--bg);border:1px solid var(--b);border-radius:24px 24px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom))}
 @media(min-width:640px){.mo{align-items:center}.sh{border-radius:24px}}
 .sh h3{margin:0 0 12px}label{display:block;font-size:12.5px;color:var(--m);margin:11px 0 5px}
 .row{display:flex;gap:10px}.row>*{flex:1}
+.sw{display:flex;gap:8px;flex-wrap:wrap}.sw span{width:38px;height:38px;border-radius:50%;cursor:pointer;border:3px solid transparent}
+.sw span.on{border-color:var(--t)}
 #qr{display:grid;place-items:center;padding:14px;background:#fff;border-radius:16px;margin:8px auto;width:fit-content}
 .lk{font-size:11.5px;word-break:break-all;color:var(--m);background:var(--in);padding:9px;border-radius:10px;margin-top:6px;direction:ltr;text-align:left}
 #toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-90px);background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;padding:11px 20px;border-radius:99px;font-size:14px;z-index:50;transition:.3s}
 #toast.on{transform:translateX(-50%)}
-.empty{text-align:center;color:var(--m);padding:40px 0}
+.wrap{flex-wrap:wrap}.empty{text-align:center;color:var(--m);padding:40px 0}
+
+:root{--gl:.4}
+::selection{background:var(--a);color:#fff}
+*{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--a) 60%,transparent) transparent}
 #fx{position:fixed;inset:0;z-index:-1;pointer-events:none}
 #grain{position:fixed;inset:0;pointer-events:none;z-index:70;opacity:.08;mix-blend-mode:overlay;display:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
 body[data-ns="1"] #grain{display:block}
+.card{position:relative;transition:transform .25s,box-shadow .25s,border-color .25s}
+.card::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(320px circle at var(--mx,50%) var(--my,50%),color-mix(in srgb,var(--a) 24%,transparent),transparent 62%)}
+body[data-sp="1"] .card:hover::after{opacity:1}
+body[data-bd=gradient] .card::before,body[data-bd=animated] .card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;pointer-events:none;background:linear-gradient(135deg,var(--a),var(--a2),var(--a));background-size:300% 300%;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+body[data-bd=animated] .card::before{animation:bd 4s linear infinite}
+@keyframes bd{to{background-position:300% 0}}
+body[data-hv=lift] .u:hover{transform:translateY(-3px);box-shadow:0 14px 34px -12px color-mix(in srgb,var(--a) calc(var(--gl)*80%),transparent)}
+body[data-hv=glow] .u:hover{box-shadow:0 0 calc(10px + var(--gl)*30px) color-mix(in srgb,var(--a) calc(var(--gl)*75%),transparent)}
+header h1{font-size:22px;letter-spacing:.3px}
+body[data-tf=gradient] .tt,body[data-tf=animated] .tt{background:linear-gradient(90deg,var(--a),var(--a2),var(--a));background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent}
+body[data-tf=animated] .tt{animation:tx 4s linear infinite}
+@keyframes tx{to{background-position:200% center}}
+.st b{background:linear-gradient(90deg,var(--a),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.av{box-shadow:0 4px calc(var(--gl)*22px) color-mix(in srgb,var(--a) calc(var(--gl)*55%),transparent)}
+.pb div{box-shadow:0 0 calc(var(--gl)*14px) color-mix(in srgb,var(--a) calc(var(--gl)*70%),transparent)}
+.fab{box-shadow:0 10px calc(10px + var(--gl)*28px) color-mix(in srgb,var(--a) calc(20% + var(--gl)*50%),transparent);animation:pl 2.8s ease-in-out infinite}
+@keyframes pl{50%{transform:translateY(-3px) scale(1.03)}}
+.btn,.chip,.ic{transition:transform .15s,filter .2s}
+.btn:active,.chip:active,.ic:active,.fab:active{transform:scale(.95)}
+.btn:hover,.chip:hover,.ic:hover{filter:brightness(1.15)}
+.tag.ok::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-left:5px;animation:pd 1.6s infinite}
+@keyframes pd{50%{opacity:.25}}
+.mo.on .sh{animation:shu .38s cubic-bezier(.2,1.2,.4,1)}
+@keyframes shu{from{transform:translateY(40px) scale(.97);opacity:0}}
+@keyframes fu{from{opacity:0;transform:translateY(16px)}}
+@keyframes sl{from{opacity:0;transform:translateX(-24px)}}
+@keyframes pp{from{opacity:0;transform:scale(.88)}}
+body[data-en=fade] .ani{animation:fu .55s both;animation-delay:calc(var(--i,0)*45ms)}
+body[data-en=slide] .ani{animation:sl .5s both;animation-delay:calc(var(--i,0)*45ms)}
+body[data-en=pop] .ani{animation:pp .45s cubic-bezier(.2,1.4,.4,1) both;animation-delay:calc(var(--i,0)*45ms)}
+.stats>.st:nth-child(2){--i:1}.stats>.st:nth-child(3){--i:2}.stats>.st:nth-child(4){--i:3}
+body[data-bt=solid] .btn.p,body[data-bt=solid] .fab,body[data-bt=solid] .chip.on{background:var(--a)}
+body[data-bt=pill] .btn,body[data-bt=pill] .fab,body[data-bt=pill] .chip,body[data-bt=pill] .ic{border-radius:99px}
+body[data-bt=outline] .btn.p,body[data-bt=outline] .fab,body[data-bt=outline] .chip.on{background:transparent;color:var(--a);border:2px solid var(--a);box-shadow:none}
+.gp{border:1px solid var(--b);border-radius:14px;padding:2px 12px 12px;margin:10px 0;background:var(--c)}
+.gp summary{cursor:pointer;padding:11px 0;font-weight:700}
+
 header{position:sticky;top:0;z-index:15;margin:-14px -14px 12px;padding:12px 14px;-webkit-backdrop-filter:blur(var(--bl));backdrop-filter:blur(var(--bl));background:color-mix(in srgb,var(--bg) 72%,transparent);border-bottom:1px solid var(--b)}
+#mc{z-index:40}
 .mh{display:flex;align-items:center;gap:12px;margin-bottom:12px}
 .mh h3{margin:0}.mh small{color:var(--m)}
-.mi{width:46px;height:46px;flex:none;border-radius:14px;display:grid;place-items:center;font-size:22px;background:linear-gradient(135deg,var(--a),var(--a2))}
+.mi{width:46px;height:46px;flex:none;border-radius:14px;display:grid;place-items:center;font-size:22px;background:linear-gradient(135deg,var(--a),var(--a2));box-shadow:0 6px calc(var(--gl)*22px) color-mix(in srgb,var(--a) calc(var(--gl)*60%),transparent)}
 .x{margin-inline-start:auto;width:38px;height:38px;flex:none;border-radius:12px;border:1px solid var(--b);background:var(--c2);color:var(--t);cursor:pointer;font-size:16px}
 .sec{border:1px solid var(--b);background:var(--c);border-radius:var(--r);padding:12px;margin:10px 0}
 .sec h4{margin:0 0 8px;font-size:14px}
@@ -80,11 +124,12 @@ header{position:sticky;top:0;z-index:15;margin:-14px -14px 12px;padding:12px 14p
 .sumc div{text-align:center}.sumc b{display:block;font-size:16px}.sumc small{color:var(--m);font-size:11px}
 .sumc .wide{grid-column:1/-1;border-top:1px dashed var(--b);padding-top:8px}
 .ptiles,.tpls,.lks{display:grid;grid-template-columns:1fr 1fr;gap:8px}.lks{grid-template-columns:repeat(3,1fr)}
-.pt,.tp{padding:11px;border:1.5px solid var(--b);border-radius:14px;cursor:pointer;background:var(--in);position:relative}
+.pt,.tp{padding:11px;border:1.5px solid var(--b);border-radius:14px;cursor:pointer;background:var(--in);transition:.2s;position:relative}
 .pt b,.tp b{display:block}.pt small,.tp small{color:var(--m);font-size:11.5px}
 .pt.on{border-color:var(--a);background:color-mix(in srgb,var(--a) 15%,transparent)}
 .pt.on::after{content:"✓";position:absolute;top:6px;left:9px;color:var(--a);font-weight:900}
-.lk2{padding:15px 8px;border-radius:14px;color:#fff;font-weight:800;text-align:center;cursor:pointer;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,.45)}
+.tp{background:linear-gradient(135deg,color-mix(in srgb,var(--a) 18%,transparent),transparent)}.tp:active,.pt:active{transform:scale(.96)}
+.lk2{padding:15px 8px;border-radius:14px;color:#fff;font-weight:800;text-align:center;cursor:pointer;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,.45);transition:.2s}.lk2:hover{transform:scale(1.05)}
 .rw{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0}
 .sw2{width:48px;height:27px;border-radius:99px;background:var(--in);border:1px solid var(--b);position:relative;cursor:pointer;flex:none;transition:.25s}
 .sw2 i{position:absolute;top:2px;right:2px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.25s}
@@ -92,26 +137,29 @@ header{position:sticky;top:0;z-index:15;margin:-14px -14px 12px;padding:12px 14p
 .big{font-size:22px;font-weight:800;text-align:center}
 input[type=range]{accent-color:var(--a);padding:0;margin-top:8px}
 .stk{position:sticky;bottom:-18px;margin:14px -18px -18px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 38%)}
-.ats{display:none;margin-top:8px;padding:9px 12px;border-radius:12px;font-size:13px}
-.ats.ok,.ats.bad,.ats.run{display:block}
-.ats.ok{background:#1fa86a33;color:#35d68a}.ats.bad{background:#e5484d33;color:#ff7a80}.ats.run{background:var(--in);color:var(--m)}
+.stk .btn{padding:13px 6px;font-size:15px}
+.empty p{margin:6px 0 14px}
+.ats{display:none;margin-top:8px;padding:9px 12px;border-radius:12px;font-size:13px;line-height:1.7}
+.ats.ok,.ats.bad,.ats.warn,.ats.run{display:block}
+.ats.ok{background:#1fa86a33;color:#35d68a}.ats.bad{background:#e5484d33;color:#ff7a80}.ats.warn{background:#f59e0b33;color:#fbbf24}.ats.run{background:var(--in);color:var(--m)}
+.fok{outline:2px solid #22c55e!important;outline-offset:-1px}.fbad{outline:2px solid #ef4444!important;outline-offset:-1px}
 </style>
 </head>
 <body data-bg="gradient" data-an="on">
 <canvas id="fx"></canvas><div id="grain"></div>
 <div class="w">
   <header>
-    <h1 id="ttl">👑 KING_PANNEL</h1>
+    <h1 id="ttl">🛰️ پنل مدیریت</h1>
     <button class="ic" onclick="openDiag()" title="عیب‌یابی">🩺</button>
     <button class="ic" onclick="openSet()" title="تنظیمات">⚙️</button>
     <button class="ic" onclick="location='/logout'" title="خروج">🚪</button>
   </header>
 
   <div class="stats">
-    <div class="card st"><i>👥</i><small>کل کاربران</small><b id="s1">–</b></div>
-    <div class="card st"><i>✅</i><small>فعال</small><b id="s2">–</b></div>
-    <div class="card st"><i>📊</i><small>کل مصرف</small><b id="s3">–</b></div>
-    <div class="card st"><i>🖥️</i><small>بار سرور</small><b id="s4">–</b></div>
+    <div class="card st ani"><i>👥</i><small>کل کاربران</small><b id="s1">–</b></div>
+    <div class="card st ani"><i>✅</i><small>فعال</small><b id="s2">–</b></div>
+    <div class="card st ani"><i>📊</i><small>کل مصرف</small><b id="s3">–</b></div>
+    <div class="card st ani"><i>🖥️</i><small>رم / بار سرور</small><b id="s4" style="font-size:17px">–</b></div>
   </div>
 
   <div id="errb" class="ats" style="margin-top:10px"></div>
@@ -136,150 +184,237 @@ const api=async(m,u,b)=>{const r=await fetch(u,{method:m,headers:{'Content-Type'
 const GB=1073741824,fb=x=>x>=GB?(x/GB).toFixed(2)+' GB':(x/1048576).toFixed(1)+' MB';
 const COLORS=['#7c5cff','#3b82f6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#a855f7'];
 let users=[],S={},filt='all',editId=null,qs='',qv='';
-function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1500)}
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1800)}
 function cl(id){$(id).classList.remove('on')}
 async function cp(t){try{await navigator.clipboard.writeText(t)}catch(e){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove()}toast('✅ کپی شد')}
 
-const FONTS={system:'system-ui,Tahoma,sans-serif',vazir:'Vazirmatn,Tahoma,sans-serif',tahoma:'Tahoma,sans-serif',mono:'ui-monospace,Menlo,monospace'};
-const PAL={amoled:['#000000','#f2f2f7','#8a8a93','rgba(255,255,255,.1)','dark'],nord:['#2e3440','#eceff4','#9aa5b8','rgba(255,255,255,.12)','dark'],dracula:['#1e1f29','#f8f8f2','#9aa0c0','rgba(255,255,255,.12)','dark'],abyss:['#04121f','#e6f4ff','#7fa3bf','rgba(120,190,255,.16)','dark'],paper:['#f7f5ef','#1d1b16','#6f6a5c','#e5e0d2','light']};
+const FONTS={system:'system-ui,Tahoma,sans-serif',vazir:'Vazirmatn,Tahoma,sans-serif',tahoma:'Tahoma,sans-serif',mono:'ui-monospace,Menlo,Consolas,monospace'};
+const PAL={amoled:['#000000','#f2f2f7','#8a8a93','rgba(255,255,255,.1)','dark'],nord:['#2e3440','#eceff4','#9aa5b8','rgba(255,255,255,.12)','dark'],dracula:['#1e1f29','#f8f8f2','#9aa0c0','rgba(255,255,255,.12)','dark'],abyss:['#04121f','#e6f4ff','rgba(120,190,255,.16)','dark'],wine:['#160a12','#fbeaf1','rgba(255,150,190,.15)','dark'],forest:['#07140d','#e7f7ec','rgba(120,255,170,.14)','dark'],paper:['#f7f5ef','#1d1b16','#6f6a5c','#e5e0d2','light'],sand:['#f6efe6','#2a2118','#7a6a58','#e6d9c6','light'],mint:['#eefaf5','#10281f','#5c7d6f','#d3ece1','light']};
 function applyTheme(T=S){window.__T=T;const r=document.documentElement,st=r.style,d=document.body.dataset,P=PAL[T.palette];
  st.setProperty('--a',T.accent);st.setProperty('--a2',T.accent2);st.setProperty('--r',T.radius+'px');
- st.setProperty('--fs',T.fsize+'px');st.setProperty('--bl',T.blur+'px');st.setProperty('--ff',FONTS[T.font]||FONTS.system);
+ st.setProperty('--fs',T.fsize+'px');st.setProperty('--bl',T.blur+'px');st.setProperty('--gl',(T.glow??40)/100);
+ st.setProperty('--ff',FONTS[T.font]||FONTS.system);
  st.setProperty('--avr',{circle:'50%',squircle:'13px',square:'4px'}[T.shape]||'13px');
  let t=P?P[4]:T.theme;if(t==='auto')t=matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';r.dataset.t=t;
  ['--bg','--t','--m','--b'].forEach((k,i)=>P?st.setProperty(k,P[i]):st.removeProperty(k));
  st.setProperty('--c',t==='dark'?`rgba(255,255,255,${.02+T.opacity*.0018})`:`rgba(255,255,255,${.4+T.opacity*.006})`);
  Object.assign(d,{bg:T.bg,cs:T.cardstyle,ly:T.layout,d:T.density,an:T.anim==='0'?'off':'on',bd:T.border||'normal',hv:T.hover||'lift',sp:T.spot??'1',tf:T.titlefx||'gradient',bt:T.btn||'gradient',en:T.enter||'fade',ns:T.noise||'0'});
- $('ttl').innerHTML='👑 KING_PANNEL';document.title='KING_PANNEL';
+ const bi=(T.bgimg||'').replace(/["\\]/g,'');document.body.style.background=T.bg==='photo'&&/^(https?:|data:image)/.test(bi)?`linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)),url("${bi}") center/cover fixed`:'';
+ if(T.font==='vazir'&&!$('vf')){const l=document.createElement('link');l.id='vf';l.rel='stylesheet';l.href='https://cdn.jsdelivr.net/npm/vazirmatn@33.0.3/Vazirmatn-font-face.css';document.head.appendChild(l)}
+ $('ttl').innerHTML='<span>🛰️</span> <span class="tt">'+esc(T.title)+'</span>';document.title=T.title;
  fx(T.fx||'none',T.accent+'|'+T.accent2)}
+const barBg=c=>S.pbar==='status'?c:S.pbar==='striped'?'repeating-linear-gradient(45deg,var(--a) 0 10px,var(--a2) 10px 20px)':'linear-gradient(90deg,var(--a),var(--a2))';
 let FXk='',FXr=0,rz;
 function fx(mode,col){const k=mode+col+(document.body.dataset.an||'');if(k===FXk)return;FXk=k;cancelAnimationFrame(FXr);
  const c=$('fx'),x=c.getContext('2d');c.width=innerWidth;c.height=innerHeight;x.clearRect(0,0,c.width,c.height);
  if(mode==='none'||document.body.dataset.an==='off'||matchMedia('(prefers-reduced-motion:reduce)').matches)return;
  const [a,b]=col.split('|'),W=c.width,H=c.height,R=Math.random,
- P=Array.from({length:mode==='bubbles'?28:70},()=>({x:R()*W,y:R()*H,r:R()*2+.6,v:R()*.7+.25,p:R()*6.28}));let t=0,last=0;
+ P=Array.from({length:mode==='bubbles'?28:70},()=>({x:R()*W,y:R()*H,r:R()*2+.6,v:R()*.7+.25,p:R()*6.28})),
+ D=Array.from({length:Math.ceil(W/16)},()=>R()*H/16);let t=0,last=0;
  const loop=ts=>{FXr=requestAnimationFrame(loop);if(ts-last<33)return;last=ts;t+=.03;
+  if(mode==='matrix'){x.globalCompositeOperation='destination-out';x.fillStyle='rgba(0,0,0,.14)';x.fillRect(0,0,W,H);x.globalCompositeOperation='source-over';x.fillStyle=a;x.font='14px monospace';
+   D.forEach((d,i)=>{x.fillText(String.fromCharCode(0x30A0+R()*60|0),i*16,d*16);D[i]=d*16>H&&R()>.975?0:d+.5});return}
   x.clearRect(0,0,W,H);
   P.forEach(p=>{
    if(mode==='stars'){x.globalAlpha=.35+.65*Math.abs(Math.sin(t+p.p));x.fillStyle=p.r>1.8?b:'#fff';x.beginPath();x.arc(p.x,p.y,p.r*.8,0,6.28);x.fill();p.x-=p.v*.1;if(p.x<0)p.x=W}
    else if(mode==='snow'){x.globalAlpha=.8;x.fillStyle='#fff';x.beginPath();x.arc(p.x+Math.sin(t+p.p)*12,p.y,p.r*1.3,0,6.28);x.fill();p.y+=p.v*1.4;if(p.y>H)p.y=-5}
+   else if(mode==='fireflies'){x.globalAlpha=.3+.7*Math.abs(Math.sin(t*1.5+p.p));x.fillStyle=a;x.shadowColor=a;x.shadowBlur=14;x.beginPath();x.arc(p.x,p.y,p.r*1.4,0,6.28);x.fill();p.shadowBlur=0;p.x+=Math.sin(t+p.p)*.6;p.y+=Math.cos(t*.8+p.p)*.5}
    else{x.globalAlpha=.4;x.strokeStyle=b;x.lineWidth=1.2;x.beginPath();x.arc(p.x+Math.sin(t+p.p)*8,p.y,p.r*5,0,6.28);x.stroke();p.y-=p.v*1.1;if(p.y<-20)p.y=H+10}});
   x.globalAlpha=1};
  FXr=requestAnimationFrame(loop)}
 addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{FXk='';applyTheme(window.__T||S)},300)});
+document.addEventListener('pointermove',e=>{const c=e.target.closest&&e.target.closest('.card');if(c){const r=c.getBoundingClientRect();c.style.setProperty('--mx',e.clientX-r.left+'px');c.style.setProperty('--my',e.clientY-r.top+'px')}});
 
-const PN={vmess:'VMess',vless:'VLESS',trojan:'Trojan',vlessh:'VLESS-HU'};
-function render(){
+const PN={vmess:'VMess',vless:'VLESS',trojan:'Trojan',vlessh:'VLESS-HU',reality:'Reality'};
+function render(){const an=!window._r;window._r=1;
  const q=$('q').value.trim().toLowerCase(),now=Date.now()/1000;
  const F={all:u=>1,active:u=>u.active,expired:u=>u.expire&&u.expire<now,off:u=>!u.enabled,full:u=>u.limit_bytes&&u.up+u.down>=u.limit_bytes};
  const N={all:'همه',active:'فعال',expired:'منقضی',full:'حجم تمام',off:'غیرفعال'};
  $('chips').innerHTML=Object.keys(N).map(k=>`<div class="chip ${filt===k?'on':''}" onclick="filt='${k}';render()">${N[k]} (${users.filter(F[k]).length})</div>`).join('');
  const L=users.filter(F[filt]).filter(u=>!q||(u.name+' '+u.note).toLowerCase().includes(q));
- $('list').innerHTML=L.length?L.map(u=>{
+ $('list').innerHTML=L.length?L.map((u,i)=>{
   const used=u.up+u.down,p=u.limit_bytes?Math.min(100,used/u.limit_bytes*100):0;
   const col=p<70?'#22c55e':p<90?'#f59e0b':'#ef4444';
   const days=u.expire?Math.ceil((u.expire-now)/86400):null;
-  const exp=u.ttl_days&&!u.expire?'⏳ اولین اتصال ('+u.ttl_days+' روز)':days===null?'♾️ نامحدود':days<=0?'⛔ منقضی':days+' روز مانده';
+  const exp=u.ttl_days&&!u.expire?'⏳ از اولین اتصال ('+u.ttl_days+' روز)':days===null?'♾️ نامحدود':days<=0?'⛔ منقضی شده':days+' روز مانده';
   const tag=!u.enabled?['off','غیرفعال']:u.active?['ok','فعال']:['no','تمام شده'];
-  return `<div class="card u"><div class="top"><div class="av">${esc(u.name[0]||'?')}</div>
+  return `<div class="card u ${an?'ani':''}" style="--i:${Math.min(i,12)}"><div class="top"><div class="av">${esc(u.name[0]||'?')}</div>
   <div class="nm"><b>${esc(u.name)}</b><small>${u.protos.split(',').map(p=>PN[p]||p).join(' · ')} · ${u.port}${u.note?' · '+esc(u.note):''}</small></div><span class="tag ${tag[0]}">${tag[1]}</span></div>
-  <div class="pb"><div style="width:${u.limit_bytes?p:100}%;background:${col};${u.limit_bytes?'':'opacity:.35'}"></div></div>
+  <div class="pb"><div style="width:${u.limit_bytes?p:100}%;background:${barBg(col)};${u.limit_bytes?'':'opacity:.35'}"></div></div>
   <div class="meta"><span>${fb(used)} / ${u.limit_bytes?fb(u.limit_bytes):'♾️'}</span><span>${exp}</span></div>
   <div class="meta" style="margin-top:3px"><span>↑ ${fb(u.up)}</span><span>↓ ${fb(u.down)}</span></div>
   <div class="act"><button class="btn p" onclick="qr(${u.id})">📲 لینک</button>
   <button class="btn" onclick="cp(location.origin+'/sub/${u.token}')">🔗 ساب</button>
   <button class="btn" onclick="openUser(${u.id})">✏️</button>
   <button class="btn" onclick="up(${u.id},{enabled:${!u.enabled}})">${u.enabled?'⏸':'▶️'}</button>
-  <button class="btn" onclick="ask('مصرف صفر شود؟').then(y=>y&&up(${u.id},{reset:true}))">♻️</button>
-  <button class="btn d" onclick="rm(${u.id})">🗑</button></div></div>`}).join(''):'<div class="empty"><div style="font-size:48px">👑</div><p>هیچ کاربری یافت نشد</p></div>'}
+  <button class="btn" onclick="ask('مصرف صفر شود؟','ریست').then(y=>y&&up(${u.id},{reset:true}))">♻️</button>
+  <button class="btn d" onclick="rm(${u.id})">🗑</button></div></div>`}).join(''):'<div class="empty"><div style="font-size:54px">🛰️</div><p>'+(users.length?'کاربری با این فیلتر پیدا نشد':'هنوز کاربری نساختی')+'</p><button class="btn p" style="flex:none;padding:10px 24px" onclick="openUser()">＋ ساخت کاربر</button></div>'}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 async function load(){
  [users,S]=await Promise.all([api('GET','/api/users'),api('GET','/api/settings')]);applyTheme();render();
  const s=await api('GET','/api/stats');
  $('s1').textContent=s.users;$('s2').textContent=s.active;$('s3').textContent=fb(s.traffic);
- $('s4').textContent=Math.round(s.ram_used/s.ram_total*100)+'%'}
+ $('s4').textContent=s.ram_total?Math.round(s.ram_used/s.ram_total*100)+'% · '+s.load.toFixed(2):'–';const eb=$('errb');eb.className='ats'+(s.xray_err?' bad':'');eb.textContent=s.xray_err||''}
 
-const PROTOS=[['vmess','VMess','🔷'],['vless','VLESS','⚡'],['trojan','Trojan','🛡️'],['vlessh','VLESS-HU','🚀']];
-const PORTS=[['443','443 TLS'],['80','80 بدون TLS'],['2053','2053']];
-const TPL=[['🧪','تست','۱ گیگ · ۱ روز',1,1],['📅','ماهانه','۵۰ گیگ · ۳۰ روز',50,30],['💎','سه‌ماهه','۱۵۰ گیگ · ۹۰ روز',150,90]];
+const PROTOS=[['vmess','VMess','🔷','سازگار با اکثر اپ‌ها'],['vless','VLESS','⚡','پروتکل سبک و مدرن'],['trojan','Trojan','🛡️','شبیه ترافیک HTTPS'],['vlessh','VLESS-HU','🚀','انتقال HTTPUpgrade'],['reality','Reality','🎭','TCP مستقیم · نیاز به TCP Proxy']];
+const FPS=[['','پیش‌فرض'],['android','android'],['chrome','chrome'],['firefox','firefox'],['safari','safari'],['ios','ios'],['random','random']];
+const PORTS=[['443','443 TLS'],['80','80 بدون TLS'],['8443','8443'],['2053','2053'],['2096','2096']];
+const TPL=[['🧪','تست','۱ گیگ · ۱ روز',1,1],['📅','ماهانه','۵۰ گیگ · ۳۰ روز',50,30],['💎','سه‌ماهه','۱۵۰ گیگ · ۹۰ روز',150,90],['♾️','نامحدود','بدون حجم و زمان',0,0]];
 const chip=(g,v,t,on)=>`<div class="chip ${on?'on':''}" data-g="${g}" data-v="${v}" onclick="tg(this)">${t}</div>`;
 const gv=g=>[...document.querySelectorAll(`#mub [data-g=${g}].on`)].map(x=>x.dataset.v);
 function tg(e){const g=e.dataset.g;if(['proto','first','en'].includes(g))e.classList.toggle('on');else{document.querySelectorAll(`#mub [data-g=${g}]`).forEach(x=>x.classList.remove('on'));e.classList.add('on')}sum()}
-const setv=(i,v)=>{$(i).value=v;sum()};
+const setv=(i,v)=>{$(i).value=v;const r=$('r'+i);if(r)r.value=v;sum()};
 const rnd=()=>Math.random().toString(36).slice(2,8);
 const qc=(id,arr,suf)=>`<div class="chips wrap" style="margin-top:8px">${arr.map(x=>`<div class="chip" onclick="setv('${id}',${x})">${x?x+suf:'♾️'}</div>`).join('')}</div>`;
 const swc=(g,on,t)=>`<div class="rw"><span>${t}</span><div class="sw2 ${on?'on':''}" data-g="${g}" data-v="1" onclick="tg(this)"><i></i></div></div>`;
-function sum(){if(!$('sum'))return;const gb=+$('fg').value||0,d=+$('fd').value||0,P=gv('proto'),n=+($('fc')?$('fc').value:1)||1;
- $('sum').innerHTML=`<div><b>${P.length}</b><small>پروتکل</small></div><div><b>${gb?gb+' GB':'♾️'}</b><small>حجم</small></div><div><b>${d?d+' روز':'♾️'}</b><small>مدت</small></div><div><b>${gv('port')[0]||443}</b><small>پورت</small></div>`}
-
+function sum(){if(!$('sum'))return;const gb=+$('fg').value||0,d=+$('fd').value||0,P=gv('proto'),first=gv('first').length,n=+($('fc')?$('fc').value:1)||1;
+ const ex=d?(first?'⏳ '+d+' روز از اولین اتصال':new Date(Date.now()+d*864e5).toLocaleDateString('fa-IR')):'♾️ نامحدود';
+ $('sum').innerHTML=`<div><b>${P.length}</b><small>پروتکل</small></div><div><b>${gb?gb+' GB':'♾️'}</b><small>حجم</small></div><div><b>${d?d+' روز':'♾️'}</b><small>مدت</small></div><div><b>${gv('port')[0]||443}</b><small>پورت</small></div><div class="wide"><small>انقضا: ${ex}${P.includes('reality')&&!S.r_host?' · ⚠️ آدرس TCP Proxy رو در ⚙️ وارد کن':''}${n>1?' · ساخت '+n+' کاربر':''}</small></div>`}
 function openUser(id){editId=id||null;const u=users.find(x=>x.id===id),E=!!u,ps=E?u.protos.split(','):['vmess'];
  const gb0=E?+(u.limit_bytes/GB).toFixed(2):0,d0=E&&u.expire?Math.max(0,Math.ceil((u.expire-Date.now()/1000)/86400)):0;
- $('mub').innerHTML=`<div class="mh"><div class="mi">${E?'✏️':'✨'}</div><div><h3>${E?'ویرایش کاربر':'ساخت کانفیگ جدید'}</h3><small>سرعت بالا و آنی</small></div><button class="x" onclick="cl('mu')">✕</button></div>
+ $('mub').innerHTML=`<div class="mh"><div class="mi">${E?'✏️':'✨'}</div><div><h3>${E?'ویرایش کاربر':'ساخت کانفیگ جدید'}</h3><small>${E?esc(u.name):'همه‌چیز رو قبل از ساخت تنظیم کن'}</small></div><button class="x" onclick="cl('mu')">✕</button></div>
  <div class="sumc" id="sum"></div>
  ${E?'':`<div class="sec"><h4>⚡ قالب‌های آماده</h4><div class="tpls">${TPL.map(t=>`<div class="tp" onclick="setv('fg',${t[3]});setv('fd',${t[4]})"><b>${t[0]} ${t[1]}</b><small>${t[2]}</small></div>`).join('')}</div></div>`}
  <div class="sec"><h4>👤 هویت</h4><div class="row"><input id="fn" placeholder="نام کاربر" value="${E?esc(u.name):''}"><button class="btn" style="flex:0 0 52px" onclick="$('fn').value='user-'+rnd()">🎲</button></div>
- <textarea id="fnote" rows="2" placeholder="یادداشت" style="margin-top:8px">${E?esc(u.note):''}</textarea></div>
- <div class="sec"><h4>🔌 پروتکل‌ها</h4><div class="ptiles">${PROTOS.map(([v,t,ic])=>`<div class="pt ${ps.includes(v)?'on':''}" data-g="proto" data-v="${v}" onclick="tg(this)"><b>${ic} ${t}</b></div>`).join('')}</div></div>
- <div class="sec"><h4>📦 حجم (GB)</h4><input id="fg" class="big" type="number" min="0" value="${gb0}">${qc('fg',[1,10,30,50,100,0],' GB')}</div>
- <div class="sec"><h4>⏱️ مدت (روز)</h4><input id="fd" class="big" type="number" min="0" value="${d0}">${qc('fd',[1,7,30,90,0],' روز')}
- ${E?'':swc('first',false,'⏳ شروع از اولین اتصال')}</div>
- <div class="sec"><h4>🌐 اتصال</h4><div class="chips wrap">${PORTS.map(([v,t])=>chip('port',v,t,String(E?u.port:443)===v)).join('')}</div></div>
- <div class="act stk"><button class="btn p" onclick="saveUser()">${E?'💾 ذخیره فوری':'🚀 ساخت کانفیگ'}</button><button class="btn" onclick="cl('mu')">بستن</button></div>`;
- $('mu').classList.add('on');sum()}
-
-async function saveUser(){
- const E=!!editId,b={name:$('fn').value||'user',gb:+$('fg').value||0,days:+$('fd').value||0,note:$('fnote').value,
- protos:gv('proto'),port:+(gv('port')[0]||443),fp:'',addr:'',enabled:!!gv('en',true).length};
- if(!b.protos.length)return toast('⚠️ پروتکل انتخاب کن');
- if(!E){b.first_use=!!gv('first').length;b.count=1;b.uuid=''}
+ <textarea id="fnote" rows="2" placeholder="یادداشت (اختیاری)" style="margin-top:8px">${E?esc(u.note):''}</textarea></div>
+ <div class="sec"><h4>🔌 پروتکل‌ها (چندتایی)</h4><div class="ptiles">${PROTOS.map(([v,t,ic,ds])=>`<div class="pt ${ps.includes(v)?'on':''}" data-g="proto" data-v="${v}" onclick="tg(this)"><b>${ic} ${t}</b><small>${ds}</small></div>`).join('')}</div></div>
+ <div class="sec"><h4>📦 حجم (GB) — ۰ = نامحدود</h4><input id="fg" class="big" type="number" min="0" step="any" value="${gb0}"><input id="rfg" type="range" min="0" max="500" value="${Math.min(gb0,500)}">${qc('fg',[1,5,10,20,50,100,0],' GB')}</div>
+ <div class="sec"><h4>⏱️ مدت (روز) — ۰ = نامحدود</h4><input id="fd" class="big" type="number" min="0" value="${d0}"><input id="rfd" type="range" min="0" max="365" value="${Math.min(d0,365)}">${qc('fd',[1,7,30,60,90,180,0],' روز')}
+ ${E?'':swc('first',false,'⏳ شروع زمان از اولین اتصال')}</div>
+ <div class="sec"><h4>🌐 اتصال</h4><div class="chips wrap">${PORTS.map(([v,t])=>chip('port',v,t,String(E?u.port:443)===v)).join('')}</div>
+ <label>Fingerprint</label><div class="chips wrap">${FPS.map(([v,t])=>chip('fp',v,t,(E?u.fp:'')===v)).join('')}</div>
+ <label>آدرس اتصال اختصاصی (اختیاری)</label><div class="row"><input id="fa" dir="ltr" value="${E?esc(u.addr):''}" placeholder="IP یا دامنه"><button class="btn" style="flex:0 0 88px" onclick="testAddr()">🧪 تست</button><button class="btn" style="flex:0 0 88px" onclick="autoFind()">🔎 خودکار</button></div><div id="ats" class="ats"></div></div>
+ <div class="sec"><h4>⚙️ پیشرفته</h4>${swc('en',E?!!u.enabled:true,'✅ فعال')}
+ ${E?`<label>افزودن سریع</label><div class="act" style="margin-top:0"><button class="btn" onclick="quick({add_days:30})">+۳۰ روز</button><button class="btn" onclick="quick({add_gb:10})">+۱۰ گیگ</button><button class="btn" onclick="quick({add_gb:50})">+۵۰ گیگ</button></div>`:`<label>تعداد (ساخت گروهی)</label><div class="row"><button class="btn" onclick="setv('fc',Math.max(1,+$('fc').value-1))">−</button><input id="fc" type="number" value="1" min="1" max="200" style="text-align:center"><button class="btn" onclick="setv('fc',Math.min(200,+$('fc').value+1))">＋</button></div>
+ <label>UUID دلخواه (خالی = خودکار)</label><div class="row"><input id="fu" dir="ltr"><button class="btn" style="flex:0 0 52px" onclick="$('fu').value=crypto.randomUUID()">🎲</button></div>`}</div>
+ <div class="act stk"><button class="btn p" onclick="saveUser()">${E?'💾 ذخیره':'🚀 ساخت کانفیگ'}</button><button class="btn" onclick="cl('mu')">بستن</button></div>`;
+ $('mub').oninput=e=>{const t=e.target;if(t.id==='fg'||t.id==='fd'){const r=$('r'+t.id);if(r)r.value=t.value}if(t.id==='rfg'||t.id==='rfd')$(t.id.slice(1)).value=t.value;if(t.id==='fa')setAT('','');sum()};
+ $('mu').classList.add('on');$('mub').scrollTop=0;sum()}
+async function saveUser(){const E=!!editId,b={name:$('fn').value||'user',gb:+$('fg').value||0,days:+$('fd').value||0,note:$('fnote').value,
+ protos:gv('proto'),port:+(gv('port')[0]||443),fp:gv('fp')[0]||'',addr:$('fa').value.trim(),enabled:!!gv('en').length};
+ if(!b.protos.length)return toast('⚠️ حداقل یک پروتکل انتخاب کن');
+ if(b.addr&&AT[b.addr]==='bad'&&!(await ask('این آدرس در تست قرمز شد؛ باز هم ذخیره بشه؟','ذخیره')))return;
+ if(!E){b.first_use=!!gv('first').length;b.count=+$('fc').value||1;b.uuid=$('fu').value.trim()}
  await api(E?'PUT':'POST',E?'/api/users/'+editId:'/api/users',b);
- cl('mu');toast('✅ با موفقیت ذخیره شد');await load();
-}
-
-async function up(i,b){await api('PUT','/api/users/'+i,b);await load();toast('✅ اعمال شد')}
-async function rm(i){if(confirm('حذف شود؟')){await api('DELETE','/api/users/'+i);await load();toast('🗑️ حذف شد')}}
+ cl('mu');toast(E?'✅ ذخیره شد':b.count>1?'✅ '+b.count+' کانفیگ ساخته شد':'✅ کانفیگ ساخته شد');await load();
+ if(!E&&b.count===1&&users[0])qr(users[0].id)}
+async function quick(b){await api('PUT','/api/users/'+editId,b);toast('✅ اعمال شد');cl('mu');load()}
+const AT={};
+const isIP=a=>/^\d{1,3}(\.\d{1,3}){3}$/.test(a)||a.includes(':');
+function setAT(s,m,a,id='fa',box='ats'){const e=$(box),i=$(id);if(!e)return;e.className='ats '+s;e.textContent=m||'';i.classList.toggle('fok',s==='ok'||s==='warn');i.classList.toggle('fbad',s==='bad');if(a&&['ok','bad','warn'].includes(s))AT[a]=s}
+async function ping1(u,ms){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms),s=performance.now();
+ try{const r=await fetch(u,{cache:'no-store',signal:c.signal});const j=await r.json();return{ok:!!j&&j.svc==='vpanel',ms:performance.now()-s}}
+ catch(e){return{ok:false,ms:performance.now()-s,to:e.name==='AbortError'}}finally{clearTimeout(t)}}
+async function testAddr(id='fa',box='ats'){let a=$(id).value.trim().replace(/^https?:\/\//,'').replace(/[\/?#].*$/,'');$(id).value=a;
+ if(!a)return setAT('','',0,id,box);setAT('run','⏳ در حال تست با اینترنت خودت...',0,id,box);
+ if(!isIP(a)){const R=[];for(let i=0;i<3;i++)R.push(await ping1(`https://${a}/ping?t=${Date.now()+i}`,6000));
+  const g=R.filter(r=>r.ok);
+  if(g.length===3){const ms=Math.round(g.map(r=>r.ms).sort((x,y)=>x-y)[1]);setAT('ok',`✅ کامل سالمه · ${ms}ms · به سرور تو می‌رسه`,a,id,box);
+   if(id==='fa'&&editId){await api('PUT','/api/users/'+editId,{addr:a});toast('✅ روی کانفیگ اعمال شد');load()}else if(id==='fa')toast('✅ با ساخت کانفیگ اعمال می‌شه');return}
+  return setAT('bad',g.length?`❌ ناپایدار (${g.length} از 3 موفق)`:'❌ وصل نشد یا به سرور تو می‌رسه',a,id,box)}
+ const r=await ping1(`https://${a}/ping?t=${Date.now()}`,5000);
+ if(r.to)return setAT('bad','❌ جواب نداد (احتمالاً بسته یا فیلتره)',a,id,box);
+ setAT('warn',`🟡 آدرس از اینترنت تو در دسترسه (${Math.round(r.ms)}ms) · تقریبی: مرورگر نمی‌تونه SNI دامنه‌ت رو بفرسته، تست کامل مسیر فقط در اپ (تأخیر واقعی) ممکنه`,a,id,box)}
+async function autoFind(id='fa',box='ats'){
+ const cand=[...new Set([S.domain||S.default_domain||'',...(S.cands||'').split(/[\s,]+/)].map(x=>x.trim().replace(/^https?:\/\//,'').replace(/[\/?#].*$/,'')).filter(x=>x&&!isIP(x)&&!x.includes('YOUR-DOMAIN')))];
+ if(!cand.length)return setAT('bad','❌ دامنه‌ای برای تست نیست؛ در ⚙️ بخش اتصال کاندید اضافه کن',0,id,box);
+ let best=null;
+ for(let k=0;k<cand.length&&!best;k+=4){
+  setAT('run',`⏳ در حال تست با اینترنت تو: ${Math.min(k+4,cand.length)} از ${cand.length}`,0,id,box);
+  const R=await Promise.all(cand.slice(k,k+4).map(async d=>{const a=await ping1(`https://${d}/ping?t=${Date.now()}`,5000);if(!a.ok)return null;const b=await ping1(`https://${d}/ping?t=${Date.now()+1}`,5000);return b.ok?{d,ms:(a.ms+b.ms)/2}:null}));
+  const ok=R.filter(Boolean).sort((x,y)=>x.ms-y.ms);if(ok.length)best=ok[0]}
+ if(!best)return setAT('bad',`❌ هیچ‌کدوم از ${cand.length} آدرس با اینترنت تو کار نکرد`,0,id,box);
+ $(id).value=best.d;setAT('ok',`✅ ${best.d} · ${Math.round(best.ms)}ms · اولین آدرس سالم`,best.d,id,box);
+ if(id==='s_address'){await api('PUT','/api/settings',{address:best.d});S.address=best.d;toast('✅ آدرس پیش‌فرض همه‌ی کانفیگ‌ها شد')}
+ else if(editId){await api('PUT','/api/users/'+editId,{addr:best.d});toast('✅ روی کانفیگ اعمال شد');load()}
+ else toast('✅ با ساخت کانفیگ اعمال می‌شه')}
+async function openDiag(){
+ $('mdb').innerHTML=`<div class="mh"><div class="mi">🩺</div><div><h3>عیب‌یابی</h3><small>وضعیت واقعی Xray و مسیرها</small></div><button class="x" onclick="cl('md')">✕</button></div><div id="dgb" class="ats run">⏳ در حال بررسی...</div>`;$('md').classList.add('on');
+ const d=await api('GET','/api/diag'),row=(ok,t)=>`<div class="rw"><span>${t}</span><span>${ok?'✅':'❌'}</span></div>`;
+ $('dgb').outerHTML=`<div class="sec">${row(d.alive,'Xray در حال اجرا')}${d.err?`<div class="ats bad">${esc(d.err)}</div>`:''}</div>
+ <div class="sec"><h4>پروتکل‌ها</h4>${d.protos.map(p=>`<div class="rw" style="font-size:13px"><span>${PN[p.p]} · پورت ${p.port}</span><span>${p.listen?'✅':'❌'} گوش‌می‌ده · کاربر در Xray ${p.in_xray}/${p.wanted} ${p.in_xray==p.wanted?'✅':'⚠️'}${p.pub?` · مسیر عمومی ${p.pub==='400'?'✅':'❌'} ${p.pub}`:''}</span></div>`).join('')}</div>
+ <div class="sec"><h4>پارامترهای لینک جدیدترین کاربر</h4><div class="lk" style="direction:ltr;white-space:pre-wrap">address: ${esc(d.addr)}\nSNI/Host: ${esc(d.dom)}\nport: ${d.port}${d.r_host?`\nreality: ${esc(d.r_host)}:${esc(d.r_port)}`:''}</div></div>
+ <div class="act stk"><button class="btn p" onclick="xr()">🔄 ری‌استارت Xray</button><button class="btn" onclick="openDiag()">بررسی دوباره</button></div>`}
+async function xr(){await api('POST','/api/xray/restart');toast('✅ Xray ری‌استارت شد');openDiag()}
+function ask(msg,ok='تأیید'){return new Promise(res=>{$('mcb').innerHTML=`<div class="mh"><div class="mi">❓</div><h3>${msg}</h3></div><div class="act"><button class="btn p" id="mc_y">${ok}</button><button class="btn" id="mc_n">انصراف</button></div>`;
+ const f=v=>{cl('mc');res(v)};$('mc_y').onclick=()=>f(true);$('mc_n').onclick=()=>f(false);$('mc').onclick=e=>{if(e.target.id==='mc')f(false)};$('mc').classList.add('on')})}
+async function up(i,b){await api('PUT','/api/users/'+i,b);load()}
+async function rm(i){if(await ask('این کاربر حذف شود؟','حذف')){await api('DELETE','/api/users/'+i);load()}}
 let QL=[],QI=0;
 function qr(id){const u=users.find(x=>x.id===id);qs=location.origin+'/sub/'+u.token;QL=[{p:'sub',l:qs},...u.links];
- $('mqb').innerHTML=`<div class="mh"><div class="mi">📲</div><div style="text-align:right"><h3>${esc(u.name)}</h3></div><button class="x" onclick="cl('mq')">✕</button></div>
+ $('mqb').innerHTML=`<div class="mh"><div class="mi">📲</div><div style="text-align:right"><h3>${esc(u.name)}</h3><small>${fb(u.up+u.down)} / ${u.limit_bytes?fb(u.limit_bytes):'♾️'}</small></div><button class="x" onclick="cl('mq')">✕</button></div>
  <div class="chips wrap" style="justify-content:center" id="qtabs">${QL.map((x,i)=>`<div class="chip" onclick="showT(${i})">${x.p==='sub'?'🔗 ساب':PN[x.p]}</div>`).join('')}</div>
  <div id="qr"></div><div class="lk" id="ql"></div>
- <div class="act stk"><button class="btn p" onclick="cp(QL[QI].l)">📋 کپی لینک</button></div>`;
+ <div class="act stk"><button class="btn p" onclick="cp(QL[QI].l)">📋 کپی</button><button class="btn" onclick="shareQ()">📤 اشتراک</button></div>`;
  $('mq').classList.add('on');showT(0)}
 function showT(i){QI=i;document.querySelectorAll('#qtabs .chip').forEach((c,j)=>c.classList.toggle('on',j===i));showQ(QL[i].l)}
-function showQ(t){$('qr').innerHTML='';$('ql').textContent=t;if(window.QRCode)new QRCode($('qr'),{text:t,width:200,height:200})}
+function shareQ(){const t=QL[QI].l;navigator.share?navigator.share({text:t}).catch(()=>{}):cp(t)}
+function showQ(t){$('qr').innerHTML='';$('ql').textContent=t;if(window.QRCode)new QRCode($('qr'),{text:t,width:210,height:210,correctLevel:QRCode.CorrectLevel.L})}
 
-const PRE={midnight:['#7c5cff','#38d4ff','نیمه‌شب'],ocean:['#0ea5e9','#22d3ee','اقیانوس'],aurora:['#10b981','#6366f1','شفق'],sunset:['#f97316','#ec4899','غروب'],mono:['#94a3b8','#e2e8f0','مونو']};
-const OPT={theme:[['dark','تیره'],['light','روشن'],['auto','خودکار']],
- palette:[['default','پیش‌فرض'],['amoled','آمولد سیاه'],['nord','نورد'],['dracula','دراکولا'],['abyss','اعماق دریا'],['paper','کاغذ (روشن)']],
- bg:[['gradient','گرادیانت'],['mesh','مش'],['aurora','شفق متحرک'],['grid','شبکه'],['plain','ساده']],
- fx:[['none','بدون'],['stars','ستاره‌ها'],['snow','برف']],
- cardstyle:[['glass','شیشه‌ای'],['solid','تخت'],['outline','خط‌دار'],['neon','نئون']],
- layout:[['list','لیستی'],['grid','شبکه‌ای']]};
-const DEF={accent:'#7c5cff',accent2:'#38d4ff',theme:'dark',palette:'default',radius:'16',bg:'gradient',fx:'none',noise:'0',cardstyle:'glass',layout:'list'};
+const PRE={midnight:['#7c5cff','#38d4ff','نیمه‌شب'],ocean:['#0ea5e9','#22d3ee','اقیانوس'],aurora:['#10b981','#6366f1','شفق'],sunset:['#f97316','#ec4899','غروب'],rose:['#f43f5e','#fb923c','رز'],forest:['#22c55e','#a3e635','جنگل'],gold:['#f59e0b','#ef4444','طلا'],violet:['#a855f7','#ec4899','بنفش'],cyber:['#00f5d4','#9b5de5','سایبر'],mono:['#94a3b8','#e2e8f0','مونو']};
+const OPT={theme:['حالت تم',[['dark','تیره'],['light','روشن'],['auto','خودکار']]],
+ palette:['پالت رنگی کل صفحه',[['default','پیش‌فرض (طبق حالت تم)'],['amoled','آمولد سیاه'],['nord','نورد'],['dracula','دراکولا'],['abyss','اعماق دریا'],['wine','شراب'],['forest','جنگل شب'],['paper','کاغذ (روشن)'],['sand','شنی (روشن)'],['mint','نعنایی (روشن)']]],
+ bg:['پس‌زمینه',[['gradient','گرادیانت'],['mesh','مش'],['aurora','شفق متحرک'],['grid','شبکه'],['photo','عکس'],['plain','ساده']]],
+ fx:['افکت ذرات متحرک',[['none','بدون'],['stars','ستاره‌ها'],['snow','برف'],['matrix','ماتریکس'],['fireflies','کرم شب‌تاب'],['bubbles','حباب']]],
+ noise:['بافت دانه‌دار',[['0','خاموش'],['1','روشن']]],
+ cardstyle:['سبک کارت',[['glass','شیشه‌ای'],['solid','تخت'],['outline','خط‌دار'],['neon','نئون']]],
+ border:['حاشیه کارت',[['normal','معمولی'],['gradient','گرادیانت'],['animated','گرادیانت متحرک']]],
+ hover:['حالت هاور',[['lift','بالا آمدن'],['glow','درخشش'],['none','بدون']]],
+ spot:['نور دنبال‌کننده‌ی انگشت/ماوس',[['1','روشن'],['0','خاموش']]],
+ btn:['سبک دکمه‌ها',[['gradient','گرادیانت'],['solid','تک‌رنگ'],['pill','قرصی'],['outline','خط‌دار']]],
+ titlefx:['افکت عنوان',[['gradient','گرادیانت'],['animated','گرادیانت متحرک'],['plain','ساده']]],
+ shape:['شکل آواتار',[['circle','دایره'],['squircle','گرد'],['square','مربع']]],
+ pbar:['نوار مصرف',[['gradient','گرادیانت'],['status','رنگ وضعیت'],['striped','راه‌راه']]],
+ layout:['چیدمان کاربران',[['list','لیستی'],['grid','شبکه‌ای']]],
+ density:['تراکم',[['compact','فشرده'],['normal','معمولی'],['roomy','باز']]],
+ enter:['انیمیشن ورود کارت‌ها',[['fade','محو شدن'],['slide','لغزش'],['pop','پاپ'],['none','بدون']]],
+ anim:['انیمیشن‌ها',[['1','روشن'],['0','خاموش']]],
+ font:['فونت',[['system','سیستم'],['vazir','وزیرمتن'],['tahoma','Tahoma'],['mono','Mono']]]};
+const RNG={fsize:['اندازه متن',12,19],radius:['گردی گوشه‌ها',2,32],blur:['شدت بلور',0,40],opacity:['شفافیت کارت‌ها',0,100],glow:['شدت درخشش',0,100]};
+const GRP=[['🎨 رنگ و تم',['palette','theme','glow'],1],['🖼️ پس‌زمینه و افکت',['bg','fx','noise','blur']],['🃏 کارت‌ها',['cardstyle','border','hover','spot','radius','opacity']],['🔘 دکمه، عنوان و آواتار',['btn','titlefx','shape','pbar']],['📐 چیدمان و حرکت',['layout','density','enter','anim']],['🔤 متن',['font','fsize']]];
+const DEF={accent:'#7c5cff',accent2:'#38d4ff',theme:'dark',palette:'default',radius:'16',bg:'gradient',fx:'none',noise:'0',cardstyle:'glass',border:'normal',hover:'lift',spot:'1',btn:'gradient',titlefx:'gradient',shape:'squircle',pbar:'gradient',layout:'list',density:'normal',enter:'fade',anim:'1',font:'system',fsize:'15',blur:'14',opacity:'40',glow:'40',bgimg:''};
+const LOOKS={cyber:['⚡ سایبرپانک',{palette:'amoled',accent:'#00f5d4',accent2:'#9b5de5',fx:'matrix',bg:'plain',cardstyle:'neon',border:'animated',font:'mono',titlefx:'animated',glow:'70'}],
+ aurora:['🌌 شفق شمالی',{palette:'abyss',accent:'#10b981',accent2:'#6366f1',bg:'aurora',border:'gradient',titlefx:'animated',glow:'50'}],
+ space:['🚀 فضایی',{palette:'amoled',accent:'#a855f7',accent2:'#38d4ff',fx:'stars',border:'gradient',glow:'60'}],
+ sunset:['🌇 غروب',{palette:'wine',accent:'#f97316',accent2:'#ec4899',bg:'mesh',fx:'fireflies',border:'gradient',glow:'55'}],
+ snow:['❄️ زمستان',{palette:'abyss',accent:'#0ea5e9',accent2:'#e0f2fe',fx:'snow',glow:'35'}],
+ royal:['👑 سلطنتی',{palette:'amoled',accent:'#f59e0b',accent2:'#ef4444',bg:'plain',cardstyle:'outline',border:'gradient',titlefx:'animated',glow:'60'}],
+ matrix:['🟢 ماتریکس',{palette:'amoled',accent:'#22c55e',accent2:'#a3e635',fx:'matrix',bg:'plain',cardstyle:'outline',font:'mono',glow:'65'}],
+ clean:['🤍 مینیمال',{palette:'paper',accent:'#4f46e5',accent2:'#06b6d4',bg:'plain',cardstyle:'solid',titlefx:'plain',hover:'lift',glow:'0',spot:'0'}],
+ candy:['🍬 آبنباتی',{palette:'mint',accent:'#ec4899',accent2:'#8b5cf6',bg:'mesh',fx:'bubbles',border:'gradient',glow:'40'}]};
+const LB={palette:'default',theme:'dark',bg:'gradient',fx:'none',noise:'0',cardstyle:'glass',border:'normal',hover:'lift',spot:'1',btn:'gradient',titlefx:'gradient',font:'system',glow:'40',enter:'fade'};
 const g=k=>S[k]??DEF[k];
-
+function fld(k){const o=OPT[k],r=RNG[k];return o?`<label>${o[0]}</label><select id="s_${k}">${o[1].map(([a,b])=>`<option value="${a}">${b}</option>`).join('')}</select>`:`<label>${r[0]}: <b id="v_${k}">${g(k)}</b></label><input id="s_${k}" type="range" min="${r[1]}" max="${r[2]}" value="${g(k)}">`}
 function openSet(){
- $('sb').innerHTML=`<div class="mh"><div class="mi">⚙️</div><div><h3>تنظیمات و ظاهر</h3><small>شخصی‌سازی کامل KING_PANNEL</small></div><button class="x" onclick="closeSet()">✕</button></div>
- <label>رنگ‌های آماده</label><div class="chips" style="margin-bottom:12px">${Object.entries(PRE).map(([k,[a,b,n]])=>`<div class="chip" style="background:linear-gradient(135deg,${a},${b});color:#fff" onclick="pre('${k}')">${n}</div>`).join('')}</div>
- <label>دامنه سرور (Railway)</label><input id="s_domain" dir="ltr" value="${esc(S.domain||S.default_domain)}">
- <label>پیشوند نام کانفیگ‌ها</label><input id="s_prefix" value="${esc(S.prefix)}">
- <div class="act stk" style="margin-top:20px"><button class="btn p" onclick="saveSet()">💾 ذخیره تنظیمات</button><button class="btn" onclick="closeSet()">بستن</button></div>`;
- $('ms').classList.add('on');}
-function pre(k){S.accent=PRE[k][0];S.accent2=PRE[k][1];applyTheme()}
+ const col=(k,n)=>`<div><label>${n}</label><input id="s_${k}" type="color" value="${g(k)}" style="height:44px;padding:4px"></div>`;
+ $('sb').innerHTML=`<div class="mh"><div class="mi">🎨</div><div><h3>استودیوی ظاهر</h3><small>تغییرها زنده دیده می‌شن</small></div><button class="x" onclick="closeSet()">✕</button></div><label>عنوان پنل</label><input id="s_title" value="${esc(S.title)}">
+ <label>✨ ظاهرهای آماده (یک‌ضربه)</label><div class="lks">${Object.entries(LOOKS).map(([k,[n,o]])=>`<div class="lk2" style="background:linear-gradient(135deg,${o.accent||'#7c5cff'},${o.accent2||'#38d4ff'})" onclick="look('${k}')">${n}</div>`).join('')}</div>
+ <label>رنگ‌های آماده</label><div class="sw">${Object.entries(PRE).map(([k,[a,b,n]])=>`<span title="${n}" style="background:linear-gradient(135deg,${a},${b})" onclick="pre('${k}')"></span>`).join('')}</div>
+ <div class="row">${col('accent','رنگ اصلی')}${col('accent2','رنگ دوم')}</div>
+ ${GRP.map(([t,ks,op])=>`<details class="gp" ${op?'open':''}><summary>${t}</summary>${ks.map(k=>fld(k)).join('')}${t.includes('پس‌زمینه')?`<label>آدرس عکس پس‌زمینه (برای حالت «عکس»)</label><input id="s_bgimg" dir="ltr" value="${esc(S.bgimg||'')}" placeholder="https://...">`:''}</details>`).join('')}
+ <div class="act"><button class="btn" onclick="cp(JSON.stringify(ap()))">📤 کپی ظاهر</button><button class="btn" onclick="imp()">📥 اعمال از متن</button></div>
+ <details class="gp"><summary>🌐 اتصال</summary>
+ <label>دامنه ریلوی (SNI و Host)</label><input id="s_domain" dir="ltr" value="${esc(S.domain||S.default_domain)}" placeholder="your-app.up.railway.app">
+ <label>آدرس اتصال (IP یا دامنه؛ خالی = آدرس پیش‌فرض کد)</label><div class="row"><input id="s_address" dir="ltr" value="${esc(S.address)}"><button class="btn" style="flex:0 0 88px" onclick="testAddr('s_address','ats2')">🧪 تست</button><button class="btn" style="flex:0 0 88px" onclick="autoFind('s_address','ats2')">🔎 خودکار</button></div><div id="ats2" class="ats"></div>
+ <label>کاندیدهای تست خودکار (هر خط یک دامنه که به سرور تو می‌رسه)</label><textarea id="s_cands" dir="ltr" rows="3" placeholder="vpn.mydomain.com">${esc(S.cands||'')}</textarea>
+ <div class="row"><div><label>Fingerprint</label><select id="s_fp">${['android','chrome','firefox','safari','ios','random'].map(x=>`<option>${x}</option>`).join('')}</select></div>
+ <div><label>پیشوند نام کانفیگ</label><input id="s_prefix" value="${esc(S.prefix)}"></div></div></details>
+ <div class="act stk"><button class="btn p" onclick="saveSet()">💾 ذخیره</button><button class="btn" onclick="resetSet()">پیش‌فرض ظاهر</button><button class="btn" onclick="closeSet()">بستن</button></div>`;
+ for(const k in OPT)$('s_'+k).value=g(k);$('s_fp').value=S.fp;
+ $('sb').oninput=prev;$('ms').classList.add('on')}
+function val(){const T={...S};document.querySelectorAll('#sb [id^=s_]').forEach(e=>T[e.id.slice(2)]=e.value);for(const k in RNG){const e=$('v_'+k);if(e)e.textContent=T[k]}return T}
+const prev=()=>applyTheme(val());
+const ap=()=>{const o={};document.querySelectorAll('#sb [id^=s_]').forEach(e=>{const k=e.id.slice(2);if(!['domain','address','fp','prefix','title','cands'].includes(k))o[k]=e.value});return o};
+function pre(k){$('s_accent').value=PRE[k][0];$('s_accent2').value=PRE[k][1];prev()}
+function look(k){const L={...LB,...LOOKS[k][1]};for(const x in L){const e=$('s_'+x);if(e)e.value=L[x]}prev();toast(LOOKS[k][0])}
+function imp(){const t=prompt('متن ظاهر رو اینجا بچسبون');if(!t)return;try{const o=JSON.parse(t);for(const k in o){const e=$('s_'+k);if(e)e.value=o[k]}prev();toast('✅ اعمال شد')}catch(e){toast('⚠️ متن معتبر نیست')}}
 function closeSet(){cl('ms');applyTheme()}
-async function saveSet(){
- const b={domain:$('s_domain').value,prefix:$('s_prefix').value};
- await api('PUT','/api/settings',b);cl('ms');toast('✅ تنظیمات ذخیره شد');await load()
-}
+async function saveSet(){const b={};document.querySelectorAll('#sb [id^=s_]').forEach(e=>b[e.id.slice(2)]=e.value);
+ await api('PUT','/api/settings',b);cl('ms');toast('✅ تنظیمات ذخیره شد');load()}
+async function resetSet(){if(await ask('ظاهر به پیش‌فرض برگردد؟','بازنشانی')){await api('PUT','/api/settings',DEF);cl('ms');toast('✅ برگشت به پیش‌فرض');load()}}
 
-async function openDiag(){
- $('mdb').innerHTML=`<div class="mh"><div class="mi">🩺</div><div><h3>وضعیت هسته</h3><small>Xray Core Status</small></div><button class="x" onclick="cl('md')">✕</button></div><div id="dgb" class="ats run">⏳ در حال بررسی...</div>`;$('md').classList.add('on');
- const d=await api('GET','/api/diag');
- $('dgb').outerHTML=`<div class="sec">وضعیت Xray: <b>${d.alive?'🟢 فعال و آنلاین':'🔴 متوقف'}</b></div>`;
-}
-
-load();setInterval(load, 15000);
+load();setInterval(load,30000);
 </script>
 </body>
 </html>
