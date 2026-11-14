@@ -617,4 +617,3 @@ button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;backg
 <script>async function go(ev){ev.preventDefault();const r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},
 body:JSON.stringify({username:u.value,password:p.value})});if(r.ok)location='/admin';else e.textContent=r.status==429?'تلاش بیش از حد؛ ۱۰ دقیقه صبر کنید':r.status==401?'نام کاربری یا رمز اشتباه است':'خطای سرور (کد '+r.status+')'}
 fetch('/api/theme').then(r=>r.json()).then(t=>{const s=document.documentElement.style;s.setProperty('--a',t.accent);s.setProperty('--a2',t.accent2);document.title=t.title;document.querySelector('h2').textContent='🔐 '+t.title})</script></body></html>"""
-
