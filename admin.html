@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>پنل مدیریت</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root{--a:#7c5cff;--a2:#38d4ff;--r:16px;--fs:15px;--bl:14px;--pad:14px;--avr:13px}
 [data-t=dark]{--bg:#0a0c13;--c:rgba(255,255,255,.055);--c2:rgba(255,255,255,.09);--t:#eef0f8;--m:#8d95b0;--b:rgba(255,255,255,.1);--in:rgba(0,0,0,.28)}
@@ -150,6 +149,7 @@ input[type=range]{accent-color:var(--a);padding:0;margin-top:8px}
 <div class="w">
   <header>
     <h1 id="ttl">🛰️ پنل مدیریت</h1>
+    <button class="ic" id="bacc" onclick="openAcc()" title="مدیریت حساب‌ها" style="display:none">👑</button>
     <button class="ic" onclick="openSet()" title="تنظیمات">⚙️</button>
     <button class="ic" onclick="location='/logout'" title="خروج">🚪</button>
   </header>
@@ -161,6 +161,7 @@ input[type=range]{accent-color:var(--a);padding:0;margin-top:8px}
     <div class="card st ani"><i>🖥️</i><small>رم / بار سرور</small><b id="s4" style="font-size:17px">–</b></div>
   </div>
 
+  <div id="meb" style="color:var(--m);font-size:12.5px;margin:8px 2px 0"></div>
   <div id="errb" class="ats" style="margin-top:10px"></div>
   <div class="bar"><input id="q" placeholder="🔎 جستجوی کاربر یا یادداشت..." oninput="render()"></div>
   <div class="chips" id="chips"></div>
@@ -175,12 +176,14 @@ input[type=range]{accent-color:var(--a);padding:0;margin-top:8px}
 <div class="mo" id="mq" onclick="if(event.target===this)cl('mq')"><div class="sh" id="mqb" style="text-align:center"></div></div>
 <div class="mo" id="ms" onclick="if(event.target===this)closeSet()"><div class="sh" id="sb"></div></div>
 <div class="mo" id="mc"><div class="sh" id="mcb"></div></div>
+<div class="mo" id="mac" onclick="if(event.target===this)cl('mac')"><div class="sh" id="mab"></div></div>
 <div id="toast"></div>
 
 <script>
 const $=id=>document.getElementById(id);
-const api=async(m,u,b)=>{const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
- if(r.status===401){location='/login';throw 0}return r.json()};
+const api=async(m,u,b)=>{const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json','X-Requested-With':'panel'},body:b?JSON.stringify(b):undefined});
+ if(r.status===401){location='/login';throw 0}
+ try{return await r.json()}catch(e){return{detail:'خطای سرور ('+r.status+')'}}};
 const GB=1073741824,fb=x=>x>=GB?(x/GB).toFixed(2)+' GB':(x/1048576).toFixed(1)+' MB';
 const COLORS=['#7c5cff','#3b82f6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#a855f7'];
 let users=[],S={},filt='all',editId=null,qs='',qv='';
@@ -225,7 +228,7 @@ function fx(mode,col){const k=mode+col+(document.body.dataset.an||'');if(k===FXk
 addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{FXk='';applyTheme(window.__T||S)},300)});
 document.addEventListener('pointermove',e=>{const c=e.target.closest&&e.target.closest('.card');if(c){const r=c.getBoundingClientRect();c.style.setProperty('--mx',e.clientX-r.left+'px');c.style.setProperty('--my',e.clientY-r.top+'px')}});
 
-const PN={vmess:'VMess',vless:'VLESS',trojan:'Trojan',vlessh:'VLESS-HU',reality:'Reality'};
+const PN={vmess:'VMess',vless:'VLESS',trojan:'Trojan',vlessh:'VLESS-HU'};
 function render(){const an=!window._r;window._r=1;
  const q=$('q').value.trim().toLowerCase(),now=Date.now()/1000;
  const F={all:u=>1,active:u=>u.active,expired:u=>u.expire&&u.expire<now,off:u=>!u.enabled,full:u=>u.limit_bytes&&u.up+u.down>=u.limit_bytes};
@@ -251,15 +254,18 @@ function render(){const an=!window._r;window._r=1;
   <button class="btn d" onclick="rm(${u.id})">🗑</button></div></div>`}).join(''):'<div class="empty"><div style="font-size:54px">🛰️</div><p>'+(users.length?'کاربری با این فیلتر پیدا نشد':'هنوز کاربری نساختی')+'</p><button class="btn p" style="flex:none;padding:10px 24px" onclick="openUser()">＋ ساخت کاربر</button></div>'}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-async function load(){
- [users,S]=await Promise.all([api('GET','/api/users'),api('GET','/api/settings')]);applyTheme();render();
- const s=await api('GET','/api/stats');
- $('s1').textContent=s.users;$('s2').textContent=s.active;$('s3').textContent=fb(s.traffic);
- $('s4').textContent=s.ram_total?Math.round(s.ram_used/s.ram_total*100)+'% · '+s.load.toFixed(2):'–';const eb=$('errb');eb.className='ats'+(s.xray_err?' bad':'');eb.textContent=s.xray_err||''}
+let ME={},LT=0;
+async function load(){const d=await api('GET','/api/all');if(d.detail)return;ME=d.me;users=d.users;S=d.settings;applyTheme();render();stats(d.stats)}
+function stats(s){$('s1').textContent=s.users;$('s2').textContent=s.active;$('s3').textContent=fb(s.traffic);
+ $('s4').textContent=s.ram_total?Math.round(s.ram_used/s.ram_total*100)+'% · '+s.load.toFixed(2):'–';
+ const eb=$('errb');eb.className='ats'+(s.xray_err?' bad':s.applying?' run':'');eb.textContent=s.xray_err||(s.applying?'⏳ در حال اعمال تغییرات روی سرور...':'');
+ $('meb').textContent='👤 '+ME.email+(ME.max_users?' · کاربر '+users.length+' از '+ME.max_users:'')+(ME.max_gb?' · سهمیه حجم '+fb(users.reduce((a,u)=>a+u.limit_bytes,0))+' از '+ME.max_gb+' GB':'');
+ $('bacc').style.display=ME.role==='owner'?'':'none';
+ clearTimeout(LT);if(s.applying)LT=setTimeout(load,1800)}
 
-const PROTOS=[['vmess','VMess','🔷','سازگار با اکثر اپ‌ها'],['vless','VLESS','⚡','پروتکل سبک و مدرن'],['trojan','Trojan','🛡️','شبیه ترافیک HTTPS'],['vlessh','VLESS-HU','🚀','انتقال HTTPUpgrade'],['reality','Reality','🎭','TCP مستقیم · نیاز به TCP Proxy']];
+const PROTOS=[['vmess','VMess','🔷','سازگار با اکثر اپ‌ها'],['vless','VLESS','⚡','پروتکل سبک و مدرن'],['trojan','Trojan','🛡️','شبیه ترافیک HTTPS'],['vlessh','VLESS-HU','🚀','انتقال HTTPUpgrade']];
 const FPS=[['','پیش‌فرض'],['android','android'],['chrome','chrome'],['firefox','firefox'],['safari','safari'],['ios','ios'],['random','random']];
-const PORTS=[['443','443 TLS'],['80','80 بدون TLS'],['8443','8443'],['2053','2053'],['2096','2096']];
+const PORTS=[['443','443 TLS'],['8443','8443'],['2053','2053'],['2096','2096']];
 const TPL=[['🧪','تست','۱ گیگ · ۱ روز',1,1],['📅','ماهانه','۵۰ گیگ · ۳۰ روز',50,30],['💎','سه‌ماهه','۱۵۰ گیگ · ۹۰ روز',150,90],['♾️','نامحدود','بدون حجم و زمان',0,0]];
 const chip=(g,v,t,on)=>`<div class="chip ${on?'on':''}" data-g="${g}" data-v="${v}" onclick="tg(this)">${t}</div>`;
 const gv=g=>[...document.querySelectorAll(`#mub [data-g=${g}].on`)].map(x=>x.dataset.v);
@@ -270,7 +276,7 @@ const qc=(id,arr,suf)=>`<div class="chips wrap" style="margin-top:8px">${arr.map
 const swc=(g,on,t)=>`<div class="rw"><span>${t}</span><div class="sw2 ${on?'on':''}" data-g="${g}" data-v="1" onclick="tg(this)"><i></i></div></div>`;
 function sum(){if(!$('sum'))return;const gb=+$('fg').value||0,d=+$('fd').value||0,P=gv('proto'),first=gv('first').length,n=+($('fc')?$('fc').value:1)||1;
  const ex=d?(first?'⏳ '+d+' روز از اولین اتصال':new Date(Date.now()+d*864e5).toLocaleDateString('fa-IR')):'♾️ نامحدود';
- $('sum').innerHTML=`<div><b>${P.length}</b><small>پروتکل</small></div><div><b>${gb?gb+' GB':'♾️'}</b><small>حجم</small></div><div><b>${d?d+' روز':'♾️'}</b><small>مدت</small></div><div><b>${gv('port')[0]||443}</b><small>پورت</small></div><div class="wide"><small>انقضا: ${ex}${P.includes('reality')&&!S.r_host?' · ⚠️ آدرس TCP Proxy رو در ⚙️ وارد کن':''}${n>1?' · ساخت '+n+' کاربر':''}</small></div>`}
+ $('sum').innerHTML=`<div><b>${P.length}</b><small>پروتکل</small></div><div><b>${gb?gb+' GB':'♾️'}</b><small>حجم</small></div><div><b>${d?d+' روز':'♾️'}</b><small>مدت</small></div><div><b>${gv('port')[0]||443}</b><small>پورت</small></div><div class="wide"><small>انقضا: ${ex}${n>1?' · ساخت '+n+' کاربر':''}</small></div>`}
 function openUser(id){editId=id||null;const u=users.find(x=>x.id===id),E=!!u,ps=E?u.protos.split(','):['vmess'];
  const gb0=E?+(u.limit_bytes/GB).toFixed(2):0,d0=E&&u.expire?Math.max(0,Math.ceil((u.expire-Date.now()/1000)/86400)):0;
  $('mub').innerHTML=`<div class="mh"><div class="mi">${E?'✏️':'✨'}</div><div><h3>${E?'ویرایش کاربر':'ساخت کانفیگ جدید'}</h3><small>${E?esc(u.name):'همه‌چیز رو قبل از ساخت تنظیم کن'}</small></div><button class="x" onclick="cl('mu')">✕</button></div>
@@ -284,55 +290,31 @@ function openUser(id){editId=id||null;const u=users.find(x=>x.id===id),E=!!u,ps=
  ${E?'':swc('first',false,'⏳ شروع زمان از اولین اتصال')}</div>
  <div class="sec"><h4>🌐 اتصال</h4><div class="chips wrap">${PORTS.map(([v,t])=>chip('port',v,t,String(E?u.port:443)===v)).join('')}</div>
  <label>Fingerprint</label><div class="chips wrap">${FPS.map(([v,t])=>chip('fp',v,t,(E?u.fp:'')===v)).join('')}</div>
- <label>آدرس اتصال اختصاصی (اختیاری)</label><div class="row"><input id="fa" dir="ltr" value="${E?esc(u.addr):''}" placeholder="IP یا دامنه"><button class="btn" style="flex:0 0 88px" onclick="testAddr()">🧪 تست</button><button class="btn" style="flex:0 0 88px" onclick="autoFind()">🔎 خودکار</button></div><div id="ats" class="ats"></div></div>
+ </div>
  <div class="sec"><h4>⚙️ پیشرفته</h4>${swc('en',E?!!u.enabled:true,'✅ فعال')}
  ${E?`<label>افزودن سریع</label><div class="act" style="margin-top:0"><button class="btn" onclick="quick({add_days:30})">+۳۰ روز</button><button class="btn" onclick="quick({add_gb:10})">+۱۰ گیگ</button><button class="btn" onclick="quick({add_gb:50})">+۵۰ گیگ</button></div>`:`<label>تعداد (ساخت گروهی)</label><div class="row"><button class="btn" onclick="setv('fc',Math.max(1,+$('fc').value-1))">−</button><input id="fc" type="number" value="1" min="1" max="200" style="text-align:center"><button class="btn" onclick="setv('fc',Math.min(200,+$('fc').value+1))">＋</button></div>
  <label>UUID دلخواه (خالی = خودکار)</label><div class="row"><input id="fu" dir="ltr"><button class="btn" style="flex:0 0 52px" onclick="$('fu').value=crypto.randomUUID()">🎲</button></div>`}</div>
  <div class="act stk"><button class="btn p" onclick="saveUser()">${E?'💾 ذخیره':'🚀 ساخت کانفیگ'}</button><button class="btn" onclick="cl('mu')">بستن</button></div>`;
- $('mub').oninput=e=>{const t=e.target;if(t.id==='fg'||t.id==='fd'){const r=$('r'+t.id);if(r)r.value=t.value}if(t.id==='rfg'||t.id==='rfd')$(t.id.slice(1)).value=t.value;if(t.id==='fa')setAT('','');sum()};
+ $('mub').oninput=e=>{const t=e.target;if(t.id==='fg'||t.id==='fd'){const r=$('r'+t.id);if(r)r.value=t.value}if(t.id==='rfg'||t.id==='rfd')$(t.id.slice(1)).value=t.value;sum()};
  $('mu').classList.add('on');$('mub').scrollTop=0;sum()}
-async function saveUser(){const E=!!editId,b={name:$('fn').value||'user',gb:+$('fg').value||0,days:+$('fd').value||0,note:$('fnote').value,
- protos:gv('proto'),port:+(gv('port')[0]||443),fp:gv('fp')[0]||'',addr:$('fa').value.trim(),enabled:!!gv('en').length};
+async function saveUser(){const E=!!editId,b={name:($('fn').value||'user').slice(0,64),gb:+$('fg').value||0,days:+$('fd').value||0,note:$('fnote').value.slice(0,200),
+ protos:gv('proto'),port:+(gv('port')[0]||443),fp:gv('fp')[0]||'',enabled:!!gv('en').length};
  if(!b.protos.length)return toast('⚠️ حداقل یک پروتکل انتخاب کن');
- if(b.addr&&AT[b.addr]==='bad'&&!(await ask('این آدرس در تست قرمز شد؛ باز هم ذخیره بشه؟','ذخیره')))return;
  if(!E){b.first_use=!!gv('first').length;b.count=+$('fc').value||1;b.uuid=$('fu').value.trim()}
- await api(E?'PUT':'POST',E?'/api/users/'+editId:'/api/users',b);
- cl('mu');toast(E?'✅ ذخیره شد':b.count>1?'✅ '+b.count+' کانفیگ ساخته شد':'✅ کانفیگ ساخته شد');await load();
- if(!E&&b.count===1&&users[0])qr(users[0].id)}
-async function quick(b){await api('PUT','/api/users/'+editId,b);toast('✅ اعمال شد');cl('mu');load()}
-const AT={};
-const isIP=a=>/^\d{1,3}(\.\d{1,3}){3}$/.test(a)||a.includes(':');
-function setAT(s,m,a,id='fa',box='ats'){const e=$(box),i=$(id);if(!e)return;e.className='ats '+s;e.textContent=m||'';i.classList.toggle('fok',s==='ok'||s==='warn');i.classList.toggle('fbad',s==='bad');if(a&&['ok','bad','warn'].includes(s))AT[a]=s}
-async function ping1(u,ms){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms),s=performance.now();
- try{const r=await fetch(u,{cache:'no-store',signal:c.signal});const j=await r.json();return{ok:!!j&&j.svc==='vpanel',ms:performance.now()-s}}
- catch(e){return{ok:false,ms:performance.now()-s,to:e.name==='AbortError'}}finally{clearTimeout(t)}}
-async function testAddr(id='fa',box='ats'){let a=$(id).value.trim().replace(/^https?:\/\//,'').replace(/[\/?#].*$/,'');$(id).value=a;
- if(!a)return setAT('','',0,id,box);setAT('run','⏳ در حال تست با اینترنت خودت...',0,id,box);
- if(!isIP(a)){const R=[];for(let i=0;i<3;i++)R.push(await ping1(`https://${a}/ping?t=${Date.now()+i}`,6000));
-  const g=R.filter(r=>r.ok);
-  if(g.length===3){const ms=Math.round(g.map(r=>r.ms).sort((x,y)=>x-y)[1]);setAT('ok',`✅ کامل سالمه · ${ms}ms · به سرور تو می‌رسه`,a,id,box);
-   if(id==='fa'&&editId){await api('PUT','/api/users/'+editId,{addr:a});toast('✅ روی کانفیگ اعمال شد');load()}else if(id==='fa')toast('✅ با ساخت کانفیگ اعمال می‌شه');return}
-  return setAT('bad',g.length?`❌ ناپایدار (${g.length} از 3 موفق)`:'❌ وصل نشد یا به سرور تو نمی‌رسه',a,id,box)}
- const r=await ping1(`https://${a}/ping?t=${Date.now()}`,5000);
- if(r.to)return setAT('bad','❌ جواب نداد (احتمالاً بسته یا فیلتره)',a,id,box);
- setAT('warn',`🟡 آدرس از اینترنت تو در دسترسه (${Math.round(r.ms)}ms) · تقریبی: مرورگر نمی‌تونه SNI دامنه‌ت رو بفرسته، تست کامل مسیر فقط در اپ (تأخیر واقعی) ممکنه`,a,id,box)}
-async function autoFind(id='fa',box='ats'){
- const cand=[...new Set([S.domain||S.default_domain||'',...(S.cands||'').split(/[\s,]+/)].map(x=>x.trim().replace(/^https?:\/\//,'').replace(/[\/?#].*$/,'')).filter(x=>x&&!isIP(x)&&!x.includes('YOUR-DOMAIN')))];
- if(!cand.length)return setAT('bad','❌ دامنه‌ای برای تست نیست؛ در ⚙️ بخش اتصال کاندید اضافه کن',0,id,box);
- let best=null;
- for(let k=0;k<cand.length&&!best;k+=4){
-  setAT('run',`⏳ در حال تست با اینترنت تو: ${Math.min(k+4,cand.length)} از ${cand.length}`,0,id,box);
-  const R=await Promise.all(cand.slice(k,k+4).map(async d=>{const a=await ping1(`https://${d}/ping?t=${Date.now()}`,5000);if(!a.ok)return null;const b=await ping1(`https://${d}/ping?t=${Date.now()+1}`,5000);return b.ok?{d,ms:(a.ms+b.ms)/2}:null}));
-  const ok=R.filter(Boolean).sort((x,y)=>x.ms-y.ms);if(ok.length)best=ok[0]}
- if(!best)return setAT('bad',`❌ هیچ‌کدوم از ${cand.length} آدرس با اینترنت تو کار نکرد`,0,id,box);
- $(id).value=best.d;setAT('ok',`✅ ${best.d} · ${Math.round(best.ms)}ms · اولین آدرس سالم`,best.d,id,box);
- if(id==='s_address'){await api('PUT','/api/settings',{address:best.d});S.address=best.d;toast('✅ آدرس پیش‌فرض همه‌ی کانفیگ‌ها شد')}
- else if(editId){await api('PUT','/api/users/'+editId,{addr:best.d});toast('✅ روی کانفیگ اعمال شد');load()}
- else toast('✅ با ساخت کانفیگ اعمال می‌شه')}
+ const r=await api(E?'PUT':'POST',E?'/api/users/'+editId:'/api/users',b);
+ if(r.detail)return toast('⚠️ '+r.detail);
+ cl('mu');if(E)users=users.map(x=>x.id===r.user.id?r.user:x);else users=[...r.users,...users];
+ render();stats(r.stats);toast(E?'✅ ذخیره شد':r.users.length>1?'✅ '+r.users.length+' کانفیگ ساخته شد':'✅ کانفیگ ساخته شد');
+ if(!E&&r.users.length===1)qr(r.users[0].id)}
+async function quick(b){const r=await api('PUT','/api/users/'+editId,b);if(r.detail)return toast('⚠️ '+r.detail);users=users.map(x=>x.id===r.user.id?r.user:x);cl('mu');render();stats(r.stats);toast('✅ اعمال شد')}
 function ask(msg,ok='تأیید'){return new Promise(res=>{$('mcb').innerHTML=`<div class="mh"><div class="mi">❓</div><h3>${msg}</h3></div><div class="act"><button class="btn p" id="mc_y">${ok}</button><button class="btn" id="mc_n">انصراف</button></div>`;
  const f=v=>{cl('mc');res(v)};$('mc_y').onclick=()=>f(true);$('mc_n').onclick=()=>f(false);$('mc').onclick=e=>{if(e.target.id==='mc')f(false)};$('mc').classList.add('on')})}
-async function up(i,b){await api('PUT','/api/users/'+i,b);load()}
-async function rm(i){if(await ask('این کاربر حذف شود؟','حذف')){await api('DELETE','/api/users/'+i);load()}}
+async function up(i,b){const u=users.find(x=>x.id===i);if(!u)return;const old={...u};
+ if('enabled' in b){u.enabled=b.enabled;u.active=b.enabled&&u.active}if(b.reset){u.up=u.down=0}render();
+ const r=await api('PUT','/api/users/'+i,b);if(r.detail){Object.assign(u,old);render();return toast('⚠️ '+r.detail)}
+ users=users.map(x=>x.id===i?r.user:x);render();stats(r.stats)}
+async function rm(i){if(!(await ask('این کاربر حذف شود؟','حذف')))return;const old=users;users=users.filter(x=>x.id!==i);render();
+ const r=await api('DELETE','/api/users/'+i);if(r.detail){users=old;render();return toast('⚠️ '+r.detail)}stats(r.stats)}
 let QL=[],QI=0;
 function qr(id){const u=users.find(x=>x.id===id);qs=location.origin+'/sub/'+u.token;QL=[{p:'sub',l:qs},...u.links];
  $('mqb').innerHTML=`<div class="mh"><div class="mi">📲</div><div style="text-align:right"><h3>${esc(u.name)}</h3><small>${fb(u.up+u.down)} / ${u.limit_bytes?fb(u.limit_bytes):'♾️'}</small></div><button class="x" onclick="cl('mq')">✕</button></div>
@@ -342,7 +324,8 @@ function qr(id){const u=users.find(x=>x.id===id);qs=location.origin+'/sub/'+u.to
  $('mq').classList.add('on');showT(0)}
 function showT(i){QI=i;document.querySelectorAll('#qtabs .chip').forEach((c,j)=>c.classList.toggle('on',j===i));showQ(QL[i].l)}
 function shareQ(){const t=QL[QI].l;navigator.share?navigator.share({text:t}).catch(()=>{}):cp(t)}
-function showQ(t){$('qr').innerHTML='';$('ql').textContent=t;if(window.QRCode)new QRCode($('qr'),{text:t,width:210,height:210,correctLevel:QRCode.CorrectLevel.L})}
+let qrP;const loadQR=()=>window.QRCode?Promise.resolve():(qrP=qrP||new Promise(r=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';s.onload=r;s.onerror=r;document.head.appendChild(s)}));
+function showQ(t){$('ql').textContent=t;loadQR().then(()=>{$('qr').innerHTML='';if(window.QRCode)new QRCode($('qr'),{text:t,width:210,height:210,correctLevel:QRCode.CorrectLevel.L})})}
 
 const PRE={midnight:['#7c5cff','#38d4ff','نیمه‌شب'],ocean:['#0ea5e9','#22d3ee','اقیانوس'],aurora:['#10b981','#6366f1','شفق'],sunset:['#f97316','#ec4899','غروب'],rose:['#f43f5e','#fb923c','رز'],forest:['#22c55e','#a3e635','جنگل'],gold:['#f59e0b','#ef4444','طلا'],violet:['#a855f7','#ec4899','بنفش'],cyber:['#00f5d4','#9b5de5','سایبر'],mono:['#94a3b8','#e2e8f0','مونو']};
 const OPT={theme:['حالت تم',[['dark','تیره'],['light','روشن'],['auto','خودکار']]],
@@ -365,7 +348,7 @@ const OPT={theme:['حالت تم',[['dark','تیره'],['light','روشن'],['au
  font:['فونت',[['system','سیستم'],['vazir','وزیرمتن'],['tahoma','Tahoma'],['mono','Mono']]]};
 const RNG={fsize:['اندازه متن',12,19],radius:['گردی گوشه‌ها',2,32],blur:['شدت بلور',0,40],opacity:['شفافیت کارت‌ها',0,100],glow:['شدت درخشش',0,100]};
 const GRP=[['🎨 رنگ و تم',['palette','theme','glow'],1],['🖼️ پس‌زمینه و افکت',['bg','fx','noise','blur']],['🃏 کارت‌ها',['cardstyle','border','hover','spot','radius','opacity']],['🔘 دکمه، عنوان و آواتار',['btn','titlefx','shape','pbar']],['📐 چیدمان و حرکت',['layout','density','enter','anim']],['🔤 متن',['font','fsize']]];
-const DEF={accent:'#7c5cff',accent2:'#38d4ff',theme:'dark',palette:'default',radius:'16',bg:'gradient',fx:'none',noise:'0',cardstyle:'glass',border:'normal',hover:'lift',spot:'1',btn:'gradient',titlefx:'gradient',shape:'squircle',pbar:'gradient',layout:'list',density:'normal',enter:'fade',anim:'1',font:'system',fsize:'15',blur:'14',opacity:'40',glow:'40',bgimg:''};
+const DEF={accent:'#7c5cff',accent2:'#38d4ff',theme:'dark',palette:'default',radius:'16',bg:'gradient',fx:'none',noise:'0',cardstyle:'glass',border:'normal',hover:'lift',spot:'1',btn:'gradient',titlefx:'gradient',shape:'squircle',pbar:'gradient',layout:'list',density:'normal',enter:'fade',anim:'1',font:'system',fsize:'15',blur:'14',opacity:'40',glow:'40',bgimg:'',prefix:''};
 const LOOKS={cyber:['⚡ سایبرپانک',{palette:'amoled',accent:'#00f5d4',accent2:'#9b5de5',fx:'matrix',bg:'plain',cardstyle:'neon',border:'animated',font:'mono',titlefx:'animated',glow:'70'}],
  aurora:['🌌 شفق شمالی',{palette:'abyss',accent:'#10b981',accent2:'#6366f1',bg:'aurora',border:'gradient',titlefx:'animated',glow:'50'}],
  space:['🚀 فضایی',{palette:'amoled',accent:'#a855f7',accent2:'#38d4ff',fx:'stars',border:'gradient',glow:'60'}],
@@ -380,36 +363,39 @@ const g=k=>S[k]??DEF[k];
 function fld(k){const o=OPT[k],r=RNG[k];return o?`<label>${o[0]}</label><select id="s_${k}">${o[1].map(([a,b])=>`<option value="${a}">${b}</option>`).join('')}</select>`:`<label>${r[0]}: <b id="v_${k}">${g(k)}</b></label><input id="s_${k}" type="range" min="${r[1]}" max="${r[2]}" value="${g(k)}">`}
 function openSet(){
  const col=(k,n)=>`<div><label>${n}</label><input id="s_${k}" type="color" value="${g(k)}" style="height:44px;padding:4px"></div>`;
- $('sb').innerHTML=`<div class="mh"><div class="mi">🎨</div><div><h3>استودیوی ظاهر</h3><small>تغییرها زنده دیده می‌شن</small></div><button class="x" onclick="closeSet()">✕</button></div><label>عنوان پنل</label><input id="s_title" value="${esc(S.title)}">
+ $('sb').innerHTML=`<div class="mh"><div class="mi">🎨</div><div><h3>استودیوی ظاهر</h3><small>تغییرها زنده دیده می‌شن</small></div><button class="x" onclick="closeSet()">✕</button></div>
  <label>✨ ظاهرهای آماده (یک‌ضربه)</label><div class="lks">${Object.entries(LOOKS).map(([k,[n,o]])=>`<div class="lk2" style="background:linear-gradient(135deg,${o.accent||'#7c5cff'},${o.accent2||'#38d4ff'})" onclick="look('${k}')">${n}</div>`).join('')}</div>
  <label>رنگ‌های آماده</label><div class="sw">${Object.entries(PRE).map(([k,[a,b,n]])=>`<span title="${n}" style="background:linear-gradient(135deg,${a},${b})" onclick="pre('${k}')"></span>`).join('')}</div>
  <div class="row">${col('accent','رنگ اصلی')}${col('accent2','رنگ دوم')}</div>
- ${GRP.map(([t,ks,op])=>`<details class="gp" ${op?'open':''}><summary>${t}</summary>${ks.map(k=>fld(k)).join('')}${t.includes('پس‌زمینه')?`<label>آدرس عکس پس‌زمینه (برای حالت «عکس»)</label><input id="s_bgimg" dir="ltr" value="${esc(S.bgimg||'')}" placeholder="https://...">`:''}</details>`).join('')}
+ ${GRP.map(([t,ks,op])=>`<details class="gp" ${op?'open':''}><summary>${t}</summary>${ks.map(k=>fld(k)).join('')}${t.includes('پس‌زمینه')?`<label>آدرس https عکس پس‌زمینه (برای حالت «عکس»)</label><input id="s_bgimg" dir="ltr" value="${esc(S.bgimg||'')}" placeholder="https://...">`:''}</details>`).join('')}
+ <details class="gp"><summary>🏷️ نام و قفل‌ها</summary><label>پیشوند نام کانفیگ</label><input id="s_prefix" maxlength="20" value="${esc(S.prefix||'')}">
+ <div class="lk" style="direction:rtl;text-align:right;margin-top:10px">🔒 عنوان پنل: ${esc(S.title)}<br>🔒 دامنه‌ی کانفیگ‌ها: ${esc(ME.domain||'')}<br><small>تنظیمات حساس فقط توسط مالک سرور قابل تغییره</small></div></details>
  <div class="act"><button class="btn" onclick="cp(JSON.stringify(ap()))">📤 کپی ظاهر</button><button class="btn" onclick="imp()">📥 اعمال از متن</button></div>
- <details class="gp"><summary>🌐 اتصال</summary>
- <label>دامنه ریلوی (SNI و Host)</label><input id="s_domain" dir="ltr" value="${esc(S.domain||S.default_domain)}" placeholder="your-app.up.railway.app">
- <label>آدرس اتصال (IP یا دامنه؛ خالی = آدرس پیش‌فرض کد)</label><div class="row"><input id="s_address" dir="ltr" value="${esc(S.address)}"><button class="btn" style="flex:0 0 88px" onclick="testAddr('s_address','ats2')">🧪 تست</button><button class="btn" style="flex:0 0 88px" onclick="autoFind('s_address','ats2')">🔎 خودکار</button></div><div id="ats2" class="ats"></div>
- <label>کاندیدهای تست خودکار (هر خط یک دامنه که به سرور تو می‌رسه)</label><textarea id="s_cands" dir="ltr" rows="3" placeholder="vpn.mydomain.com">${esc(S.cands||'')}</textarea>
- <div class="row"><div><label>Fingerprint</label><select id="s_fp">${['android','chrome','firefox','safari','ios','random'].map(x=>`<option>${x}</option>`).join('')}</select></div>
- <div><label>پیشوند نام کانفیگ</label><input id="s_prefix" value="${esc(S.prefix)}"></div></div>
- <h4 style="margin:16px 0 2px">🎭 VLESS + Reality</h4><small style="color:var(--m)">در Railway ← Networking ← TCP Proxy با پورت داخلی <b>${S.reality_port||8443}</b> بساز و دامنه و پورت عمومی‌ش رو اینجا بنویس</small>
- <label>آدرس TCP Proxy (دامنه یا IP)</label><input id="s_r_host" dir="ltr" value="${esc(S.r_host||'')}" placeholder="shuttle.proxy.rlwy.net">
- <div class="row"><div><label>پورت TCP Proxy</label><input id="s_r_port" dir="ltr" value="${esc(S.r_port||'443')}"></div><div><label>سایت پوششی (dest)</label><input id="s_r_dest" dir="ltr" value="${esc(S.r_dest||'www.microsoft.com:443')}"></div></div></details>
  <div class="act stk"><button class="btn p" onclick="saveSet()">💾 ذخیره</button><button class="btn" onclick="resetSet()">پیش‌فرض ظاهر</button><button class="btn" onclick="closeSet()">بستن</button></div>`;
- for(const k in OPT)$('s_'+k).value=g(k);$('s_fp').value=S.fp;
+ for(const k in OPT)$('s_'+k).value=g(k);
  $('sb').oninput=prev;$('ms').classList.add('on')}
 function val(){const T={...S};document.querySelectorAll('#sb [id^=s_]').forEach(e=>T[e.id.slice(2)]=e.value);for(const k in RNG){const e=$('v_'+k);if(e)e.textContent=T[k]}return T}
-const prev=()=>applyTheme(val());
+const prev=(()=>{let t;return()=>{cancelAnimationFrame(t);t=requestAnimationFrame(()=>applyTheme(val()))}})();
 const ap=()=>{const o={};document.querySelectorAll('#sb [id^=s_]').forEach(e=>{const k=e.id.slice(2);if(!['domain','address','fp','prefix','title','cands','r_host','r_port','r_dest'].includes(k))o[k]=e.value});return o};
 function pre(k){$('s_accent').value=PRE[k][0];$('s_accent2').value=PRE[k][1];prev()}
 function look(k){const L={...LB,...LOOKS[k][1]};for(const x in L){const e=$('s_'+x);if(e)e.value=L[x]}prev();toast(LOOKS[k][0])}
 function imp(){const t=prompt('متن ظاهر رو اینجا بچسبون');if(!t)return;try{const o=JSON.parse(t);for(const k in o){const e=$('s_'+k);if(e)e.value=o[k]}prev();toast('✅ اعمال شد')}catch(e){toast('⚠️ متن معتبر نیست')}}
 function closeSet(){cl('ms');applyTheme()}
 async function saveSet(){const b={};document.querySelectorAll('#sb [id^=s_]').forEach(e=>b[e.id.slice(2)]=e.value);
- await api('PUT','/api/settings',b);cl('ms');toast('✅ تنظیمات ذخیره شد');load()}
-async function resetSet(){if(await ask('ظاهر به پیش‌فرض برگردد؟','بازنشانی')){await api('PUT','/api/settings',DEF);cl('ms');toast('✅ برگشت به پیش‌فرض');load()}}
+ Object.assign(S,b);applyTheme();cl('ms');render();toast('✅ تنظیمات ذخیره شد');
+ const r=await api('PUT','/api/settings',b);if(r.detail)toast('⚠️ '+r.detail)}
+async function resetSet(){if(await ask('ظاهر به پیش‌فرض برگردد؟','بازنشانی')){Object.assign(S,DEF);applyTheme();cl('ms');render();toast('✅ برگشت به پیش‌فرض');api('PUT','/api/settings',DEF)}}
 
-load();setInterval(load,30000);
+async function openAcc(){$('mab').innerHTML=`<div class="mh"><div class="mi">👑</div><div><h3>مدیریت حساب‌ها</h3><small>تأیید، سقف‌ها و دامنه‌ی هر حساب</small></div><button class="x" onclick="cl('mac')">✕</button></div><div id="accl">⏳</div>`;$('mac').classList.add('on');loadAcc()}
+async function loadAcc(){const d=await api('GET','/api/accounts');if(d.detail)return toast('⚠️ '+d.detail);
+ $('accl').innerHTML=d.accounts.map(a=>`<div class="sec"><div class="rw"><b dir="ltr">${esc(a.email)}</b><span class="tag ${a.status==='active'?'ok':a.status==='pending'?'off':'no'}">${{active:'فعال',pending:'در انتظار تأیید',blocked:'مسدود'}[a.status]||a.status}</span></div>
+ <small style="color:var(--m)">${a.role==='owner'?'👑 مالک · ':''}${a.users} کاربر · ${fb(a.traffic)} مصرف</small>
+ ${a.role==='owner'?'':`<div class="row" style="margin-top:8px"><div><label>سقف کاربر (0=نامحدود)</label><input id="am_${a.id}" type="number" min="0" value="${a.max_users}"></div><div><label>سقف حجم GB (0=نامحدود)</label><input id="ag_${a.id}" type="number" min="0" value="${a.max_gb}"></div></div>
+ <label>دامنه‌ی اختصاصی (فقط مالک؛ خالی = دامنه‌ی سرور)</label><input id="ad_${a.id}" dir="ltr" value="${esc(a.domain||'')}">
+ <div class="act"><button class="btn p" onclick="saveAcc(${a.id},'active')">✅ ذخیره و فعال</button><button class="btn" onclick="saveAcc(${a.id},'blocked')">⛔ مسدود</button><button class="btn d" onclick="delAcc(${a.id})">🗑</button></div>`}</div>`).join('')||'—'}
+async function saveAcc(id,st){const r=await api('PUT','/api/accounts/'+id,{status:st,max_users:+$('am_'+id).value||0,max_gb:+$('ag_'+id).value||0,domain:$('ad_'+id).value.trim()});if(r.detail)return toast('⚠️ '+r.detail);toast('✅ ذخیره شد');loadAcc()}
+async function delAcc(id){if(await ask('این حساب و همه‌ی کاربرهاش حذف بشه؟','حذف')){const r=await api('DELETE','/api/accounts/'+id);if(r.detail)return toast('⚠️ '+r.detail);loadAcc()}}
+load();setInterval(()=>{if(!document.hidden)load()},20000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});setTimeout(loadQR,4000);
 </script>
 </body>
 </html>
