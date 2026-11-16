@@ -71,18 +71,18 @@ def check_pw(pw, stored):
 
 DUMMY_HASH = hash_pw("dummy-password")
 
+SETUP_KEY = env("SETUP_KEY")   # optional: the first-run setup page then requires ?key=<SETUP_KEY>
+SETUP_USER_RE = re.compile(r"^[A-Za-z0-9._-]{3,32}$")
+
+def needs_setup():
+    with L:
+        return db.execute("SELECT 1 FROM accounts WHERE role='owner'").fetchone() is None
+
 def bootstrap_owner():
+    """With ADMIN_PASSWORD set the owner is managed by variables; without it the first visitor creates the owner on the setup page."""
     pw = env("ADMIN_PASSWORD")
-    path = os.path.join(DATA, "admin_password.txt")
     if not pw:
-        if os.path.exists(path):
-            pw = open(path).read().strip()
-        else:
-            pw = secrets.token_urlsafe(12)
-            with open(path, "w") as f:
-                f.write(pw)
-            os.chmod(path, 0o600)
-            print(f"[panel] ADMIN_PASSWORD not set -> generated one. user={ADMIN_USER} password={pw}", flush=True)
+        return
     with L:
         row = db.execute("SELECT id FROM accounts WHERE role='owner'").fetchone()
         if row:
@@ -642,9 +642,66 @@ def root(request: Request):
 def admin(request: Request):
     return panel_page(request)
 
+@app.post("/setup")
+def setup(body: dict, request: Request):
+    need_header(request)
+    ip = client_ip(request)
+    n, t = throttle("setup:" + ip, 20)
+    fails["setup:" + ip] = (n + 1, t)
+    if SETUP_KEY and not hmac.compare_digest(str(body.get("key", "")).encode(), SETUP_KEY.encode()):
+        time.sleep(1.0)
+        raise HTTPException(403, "Invalid setup key")
+    user = str(body.get("username", "")).strip().lower()
+    pw = str(body.get("password", ""))
+    if not SETUP_USER_RE.match(user):
+        raise HTTPException(400, "Username must be 3 to 32 characters: letters, digits, dot, dash or underscore")
+    if not 8 <= len(pw) <= 128:
+        raise HTTPException(400, "Password must be 8 to 128 characters")
+    if pw.lower() == user:
+        raise HTTPException(400, "Password must differ from the username")
+    with L:
+        if db.execute("SELECT 1 FROM accounts WHERE role='owner'").fetchone():
+            raise HTTPException(403, "Setup is already completed")
+        db.execute("INSERT INTO accounts(id,email,pw_hash,role,status,max_users,max_gb,created) VALUES(1,?,?,'owner','active',0,0,?)",
+                   (user, hash_pw(pw), int(time.time())))
+        db.commit()
+    r = Response('{"ok":true}', media_type="application/json")
+    r.set_cookie("sess", new_session(1), max_age=12 * 3600, httponly=True, samesite="strict", secure=True, path="/")
+    return r
+
 @app.get("/login", response_class=HTMLResponse)
-def login_page():
+def login_page(request: Request):
+    if needs_setup():
+        key = request.query_params.get("key", "")
+        if SETUP_KEY and not hmac.compare_digest(key.encode(), SETUP_KEY.encode()):
+            raise HTTPException(404)
+        return SETUP.replace("__TITLE__", TITLE)
     return LOGIN.replace("__TITLE__", TITLE)
+
+@app.get("/setup", response_class=HTMLResponse)
+def setup_page(request: Request):
+    return login_page(request)
+
+SETUP = """<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>__TITLE__</title>
+<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,Tahoma,sans-serif;
+background:radial-gradient(900px 500px at 80% -10%,#4b34c4 0,transparent 60%),radial-gradient(700px 500px at 0 110%,#0f6e8c 0,transparent 55%),#0a0c13;color:#eef0f8}
+.b{width:min(380px,92vw);padding:28px;border-radius:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(18px);animation:fu .6s both}
+@keyframes fu{from{opacity:0;transform:translateY(18px)}}
+h2{margin:0 0 4px}p{margin:0 0 18px;color:#9aa3bd;font-size:14px;line-height:1.6}
+input{width:100%;padding:13px 14px;margin:6px 0;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.3);color:#fff;font-size:15px}
+button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;background:linear-gradient(135deg,#7c5cff,#38d4ff);color:#fff;font-size:16px;font-weight:700}
+button:hover{filter:brightness(1.12)}#e{color:#ff6b7a;font-size:13px;min-height:18px;margin-top:8px}</style></head><body>
+<form class="b" onsubmit="go(event)"><h2>🔐 __TITLE__</h2><p>Welcome! Choose a new username and password for your panel. Keep them safe: this is the only time they are set here.</p>
+<input id="u" placeholder="New username" autocomplete="username" autocapitalize="none"><input id="p" type="password" placeholder="New password (8+ characters)" autocomplete="new-password"><input id="c" type="password" placeholder="Repeat password" autocomplete="new-password">
+<label style="font-size:13px;color:#9aa3bd;display:block;margin-top:4px"><input type="checkbox" style="width:auto;margin:6px" onchange="p.type=c.type=this.checked?'text':'password'">Show password</label>
+<button>Create account and continue</button><div id="e"></div></form>
+<script>async function go(ev){ev.preventDefault();e.textContent='';
+if(p.value!==c.value){e.textContent='Passwords do not match';return}
+let r,j={};try{r=await fetch('/setup',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'panel'},
+body:JSON.stringify({username:u.value,password:p.value,key:new URLSearchParams(location.search).get('key')||''})});
+try{j=await r.json()}catch(x){}}catch(x){e.textContent='Network error';return}
+if(r.ok)location='/admin';else e.textContent=j.detail||'Error ('+r.status+')'}</script></body></html>"""
 
 LOGIN = """<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>__TITLE__</title>
