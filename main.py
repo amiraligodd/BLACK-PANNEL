@@ -9,20 +9,15 @@ from pydantic import BaseModel
 def env(k, d=""):
     return (os.environ.get(k) or d).strip()
 
-# دامنه‌ی ریلوی: ترجیحاً متغیر DOMAIN (یا خودکار RAILWAY_PUBLIC_DOMAIN)؛ اگه هیچ‌کدوم نبود از این خط
-RAILWAY_DOMAIN = "YOUR-DOMAIN.up.railway.app"
-DOMAIN = re.sub(r"^https?://", "", env("DOMAIN") or env("RAILWAY_PUBLIC_DOMAIN") or RAILWAY_DOMAIN).split("/")[0]
-TITLE = env("PANEL_TITLE", "KING_PANNEL")          # قفل: از داخل پنل قابل تغییر نیست
+# optional override; by default the host of the incoming request is used for every config link
+DOMAIN_ENV = re.sub(r"^https?://", "", env("DOMAIN")).split("/")[0]
+TITLE = env("PANEL_TITLE", "KING_PANNEL")          # locked: cannot be changed from inside the panel
 DATA = env("DATA_DIR", "/data")
 WS_PATH = "/in2"
 GB = 1024 ** 3
-ADMIN_USER = env("ADMIN_USER", "admin").lower()    # نام کاربری مالک (رمزش: متغیر ADMIN_PASSWORD)
-ALLOW_SIGNUP = env("ALLOW_SIGNUP", "1") == "1"     # ثبت‌نام عمومی
-SIGNUP_APPROVAL = env("SIGNUP_APPROVAL", "1") == "1"   # حساب جدید تا تأیید مالک غیرفعاله
-DEFAULT_MAX_USERS = int(env("DEFAULT_MAX_USERS", "5") or 5)
-DEFAULT_MAX_GB = float(env("DEFAULT_MAX_GB", "50") or 50)   # جمع حجم کاربرهای هر حساب (0 = نامحدود)
+ADMIN_USER = env("ADMIN_USER", "admin").lower()    # owner username (password: variable ADMIN_PASSWORD)
 
-# تنظیمات ظاهری قابل‌تغییر توسط هر حساب (تنظیمات حساس مثل دامنه و عنوان قفل هستن)
+# appearance settings each account may change (sensitive settings such as domain and title are locked)
 APPEARANCE = {"accent": "#7c5cff", "accent2": "#38d4ff", "theme": "dark", "palette": "default", "radius": "16",
               "bg": "gradient", "fx": "none", "noise": "0", "cardstyle": "glass", "border": "normal", "hover": "lift",
               "spot": "1", "btn": "gradient", "titlefx": "gradient", "shape": "squircle", "pbar": "gradient",
@@ -50,19 +45,19 @@ for col in ("note TEXT DEFAULT ''", "created INTEGER DEFAULT 0", "protos TEXT DE
             "fp TEXT DEFAULT ''", "addr TEXT DEFAULT ''", "ttl_days INTEGER DEFAULT 0", "owner_id INTEGER DEFAULT 1"):
     try: db.execute("ALTER TABLE users ADD COLUMN " + col)
     except Exception: pass
-try:  # مهاجرت از نسخه‌ی قبلی: تنظیمات ظاهری قدیمی ← مالک
+try:  # migration from the previous version: old appearance settings ← owner
     if not db.execute("SELECT 1 FROM account_settings LIMIT 1").fetchone():
         for r in db.execute("SELECT k, v FROM settings").fetchall():
             if r["k"] in APPEARANCE:
                 db.execute("INSERT OR IGNORE INTO account_settings VALUES(1, ?, ?)", (r["k"], r["v"]))
 except sqlite3.OperationalError:
     pass
-for r in db.execute("SELECT id, protos FROM users WHERE protos LIKE '%reality%'").fetchall():  # Reality حذف شد
+for r in db.execute("SELECT id, protos FROM users WHERE protos LIKE '%reality%'").fetchall():  # Reality removed
     db.execute("UPDATE users SET protos=? WHERE id=?",
                (",".join(x for x in r["protos"].split(",") if x != "reality") or "vmess", r["id"]))
 db.commit()
 
-# ------------------------- رمز و نشست‌ها -------------------------
+# ------------------------- passwords and sessions -------------------------
 def hash_pw(pw, salt=None):
     salt = salt or secrets.token_bytes(16)
     return salt.hex() + "$" + hashlib.pbkdf2_hmac("sha256", pw.encode(), salt, 200_000).hex()
@@ -98,7 +93,7 @@ def bootstrap_owner():
         db.commit()
 
 SESS = {}   # token -> (account_id, expiry)
-fails = {}  # کلید (ip/email) -> (تعداد, شروع)
+fails = {}  # key (ip/email) -> (count, start)
 regs = {}
 
 def new_session(aid):
@@ -128,7 +123,7 @@ def auth(request: Request):
     if not a:
         raise HTTPException(401)
     if request.method not in ("GET", "HEAD") and request.headers.get("x-requested-with") != "panel":
-        raise HTTPException(403)   # محافظ CSRF
+        raise HTTPException(403)   # guard CSRF
     return a
 
 def owner_only(a=Depends(auth)):
@@ -145,7 +140,7 @@ def throttle(key, limit, window=600):
     if now - t > window:
         n, t = 0, now
     if n >= limit:
-        raise HTTPException(429, "تلاش زیاد؛ چند دقیقه بعد دوباره امتحان کن")
+        raise HTTPException(429, "Too many attempts; try again in a few minutes")
     return n, t
 
 def is_active(u):
@@ -157,10 +152,10 @@ def active_users():
     return [u for u in db.execute("SELECT users.* FROM users JOIN accounts ON accounts.id=users.owner_id WHERE accounts.status='active'")
             if is_active(u)]
 
-# ------------------------- مدیریت Xray -------------------------
+# ------------------------- Xray management -------------------------
 PATHS = {"vmess": WS_PATH, "vless": "/vl", "trojan": "/tr", "vlessh": "/hu"}
 LABEL = {"vmess": "VMess", "vless": "VLESS", "trojan": "Trojan", "vlessh": "VLESS-HU"}
-# پروتکل: (tag, پورت داخلی, پروتکل xray, نوع انتقال)
+# protocol: (tag, internal port, xray protocol, transport type)
 INB = {"vmess": ("vmess-in", 10000, "vmess", "ws"), "vless": ("vless-in", 10001, "vless", "ws"),
        "trojan": ("trojan-in", 10002, "trojan", "ws"), "vlessh": ("vlessh-in", 10003, "vless", "httpupgrade")}
 CONF = os.path.join(DATA, "xray.json")
@@ -180,7 +175,7 @@ def clients_for(p, users):
         if p == "vmess": out.append({"id": u["uuid"], "email": e, "alterId": 0})
         elif p == "trojan": out.append({"password": u["uuid"], "email": e})
         else: out.append({"id": u["uuid"], "email": e})
-    if not out:  # xray حداقل یک کلاینت می‌خواد
+    if not out:  # xray requires at least one client
         d = str(uuid.uuid4())
         out = [{"password": d, "email": "dummy"} if p == "trojan" else {"id": d, "email": "dummy"}]
     return out
@@ -202,7 +197,7 @@ def write_config(users, path=None):
         "policy": {"levels": {"0": {"statsUserUplink": True, "statsUserDownlink": True}}},
         "inbounds": inbounds,
         "outbounds": [{"protocol": "freedom", "tag": "direct"}, {"protocol": "blackhole", "tag": "block"}],
-        # امنیت: کاربرهای پروکسی نمی‌تونن به شبکه‌ی داخلی/لوکال (پنل، API ی Xray، railway.internal) برسن
+        # security: proxy users cannot reach the internal/local network (panel, Xray API, railway.internal)
         "routing": {"domainStrategy": "IPIfNonMatch", "rules": [
             {"type": "field", "inboundTag": ["api"], "outboundTag": "api"},
             {"type": "field", "ip": ["geoip:private"], "outboundTag": "block"}]},
@@ -251,16 +246,16 @@ def sync():
             return
         if ids == bad_ids:
             return
-        new_conf = os.path.join(DATA, "xray.new.json")   # پسوند باید .json باشه
+        new_conf = os.path.join(DATA, "xray.new.json")   # the extension must be .json
         ports = write_config(users, new_conf)
         ok, msg = xray_test(new_conf)
         if not ok:
             bad_ids = ids
-            last_err = "کانفیگ Xray نامعتبره؛ تغییر اعمال نشد: " + msg
+            last_err = "Invalid Xray config; change not applied: " + msg
             print("[xray] config test failed:", msg, flush=True)
             return
         if alive:
-            collect()  # قبل از ری‌استارت، مصرف ذخیره بشه
+            collect()  # save the usage before the restart
             proc.terminate()
             try: proc.wait(5)
             except Exception: proc.kill()
@@ -276,7 +271,7 @@ def sync():
                 except Exception: proc.kill()
         closed = [p for p in ports if not port_open(p)]
         ready = proc.poll() is None and not closed
-        last_err = "" if ready else f"Xray بالا نیومد؛ پورت‌های باز نشده: {closed or '—'}؛ لاگ Railway رو ببین"
+        last_err = "" if ready else f"Xray did not start; ports not open: {closed or '—'}; check the Railway logs"
         bad_ids = None
         current = ids
         print("[xray] started ready=%s users per protocol: %s" % (ready, {p: sum(1 for i, q in ids if q == p) for p in INB}), flush=True)
@@ -284,7 +279,7 @@ def sync():
 _ev = threading.Event()
 
 def sync_async():
-    """API فوری جواب می‌ده؛ اعمال روی Xray در پس‌زمینه (با تجمیع تغییرهای پشت‌سرهم) انجام می‌شه"""
+    """The API answers immediately; applying to Xray happens in the background (consecutive changes are batched)"""
     global pending
     pending = True
     _ev.set()
@@ -333,7 +328,7 @@ def loop():
             print("loop error:", e, flush=True)
         time.sleep(10)
 
-# ------------------------- لینک‌ها -------------------------
+# ------------------------- links -------------------------
 ALLOWED_PORTS = {443, 8443, 2053, 2083, 2087, 2096}
 FPS = {"", "android", "chrome", "firefox", "safari", "ios", "random"}
 
@@ -370,11 +365,15 @@ def settings_for(aid):
     d = dict(APPEARANCE)
     with L:
         d.update({r["k"]: r["v"] for r in db.execute("SELECT k, v FROM account_settings WHERE account_id=?", (aid,))})
-    d["title"] = TITLE   # قفل
+    d["title"] = TITLE   # locked
     return d
 
-def dom_of(a):
-    return a["domain"] or DOMAIN
+HOST_RE = re.compile(r"^[A-Za-z0-9.\-]{1,253}$")
+
+def req_host(request):
+    """Config links always point at the host the panel or subscription was opened with."""
+    h = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip().split(":")[0].lower()
+    return DOMAIN_ENV or (h if HOST_RE.match(h) else "localhost")
 
 def clean_protos(l):
     l = [p for p in (l or []) if p in PATHS]
@@ -406,7 +405,7 @@ def my_stats(a):
     return d
 
 def me_info(a):
-    return {"email": a["email"], "role": a["role"], "max_users": a["max_users"], "max_gb": a["max_gb"], "domain": dom_of(a)}
+    return {"email": a["email"], "role": a["role"], "max_users": a["max_users"], "max_gb": a["max_gb"]}
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -436,8 +435,7 @@ def start():
     threading.Thread(target=loop, daemon=True).start()
     sync_async()
 
-# ------------------------- ورود و ثبت‌نام -------------------------
-EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]{1,64}@[A-Za-z0-9.\-]{1,190}\.[A-Za-z]{2,}$")
+# ------------------------- login and sign-up -------------------------
 
 def need_header(request: Request):
     if request.headers.get("x-requested-with") != "panel":
@@ -446,7 +444,7 @@ def need_header(request: Request):
 @app.post("/login")
 def login(body: dict, request: Request):
     need_header(request)
-    ident = str(body.get("email", "")).strip().lower()[:100]
+    ident = str(body.get("username", body.get("email", ""))).strip().lower()[:100]
     pw = str(body.get("password", ""))[:200]
     ip = client_ip(request)
     n1, t1 = throttle("ip:" + ip, 15)
@@ -458,41 +456,16 @@ def login(body: dict, request: Request):
         fails["ip:" + ip] = (n1 + 1, t1)
         fails["em:" + ident] = (n2 + 1, t2)
         time.sleep(1.0)
-        raise HTTPException(401, "ایمیل یا رمز اشتباه است")
+        raise HTTPException(401, "Wrong username or password")
     if a["status"] == "pending":
-        raise HTTPException(403, "حساب هنوز توسط مالک تأیید نشده")
+        raise HTTPException(403, "Account is not yet approved by the owner")
     if a["status"] != "active":
-        raise HTTPException(403, "حساب مسدوده")
+        raise HTTPException(403, "Account is blocked")
     fails.pop("ip:" + ip, None)
     fails.pop("em:" + ident, None)
     r = Response('{"ok":true}', media_type="application/json")
     r.set_cookie("sess", new_session(a["id"]), max_age=12 * 3600, httponly=True, samesite="strict", secure=True, path="/")
     return r
-
-@app.post("/register")
-def register(body: dict, request: Request):
-    need_header(request)
-    if not ALLOW_SIGNUP:
-        raise HTTPException(403, "ثبت‌نام بسته‌ست")
-    ip = client_ip(request)
-    now = time.time()
-    regs[ip] = [t for t in regs.get(ip, []) if now - t < 3600]
-    if len(regs[ip]) >= 3:
-        raise HTTPException(429, "تعداد ثبت‌نام از این آدرس زیاده؛ بعداً امتحان کن")
-    email = str(body.get("email", "")).strip().lower()
-    pw = str(body.get("password", ""))
-    if not EMAIL_RE.match(email):
-        raise HTTPException(400, "ایمیل نامعتبره")
-    if not 8 <= len(pw) <= 128:
-        raise HTTPException(400, "رمز باید ۸ تا ۱۲۸ کاراکتر باشه")
-    with L:
-        if db.execute("SELECT 1 FROM accounts WHERE email=?", (email,)).fetchone():
-            raise HTTPException(409, "این ایمیل قبلاً ثبت شده")
-        db.execute("INSERT INTO accounts(email,pw_hash,role,status,max_users,max_gb,created) VALUES(?,?,'user',?,?,?,?)",
-                   (email, hash_pw(pw), "pending" if SIGNUP_APPROVAL else "active", DEFAULT_MAX_USERS, DEFAULT_MAX_GB, int(now)))
-        db.commit()
-    regs[ip].append(now)
-    return {"ok": True, "pending": SIGNUP_APPROVAL}
 
 @app.get("/logout")
 def logout(request: Request):
@@ -501,7 +474,7 @@ def logout(request: Request):
     r.delete_cookie("sess", path="/")
     return r
 
-# ------------------------- API کاربران -------------------------
+# ------------------------- API users -------------------------
 class NewUser(BaseModel):
     name: str
     gb: float = 0
@@ -529,27 +502,27 @@ class EditUser(BaseModel):
     reset: bool = False
 
 @app.get("/api/all")
-def api_all(a=Depends(auth)):
-    st, dom = settings_for(a["id"]), dom_of(a)
+def api_all(request: Request, a=Depends(auth)):
+    st, dom = settings_for(a["id"]), req_host(request)
     with L:
         us = db.execute("SELECT * FROM users WHERE owner_id=? ORDER BY id DESC", (a["id"],)).fetchall()
         users = [full(u, dom, st["prefix"]) for u in us]
     return {"me": me_info(a), "users": users, "settings": st, "stats": my_stats(a)}
 
 @app.post("/api/users")
-def add_user(n: NewUser, a=Depends(auth)):
+def add_user(n: NewUser, request: Request, a=Depends(auth)):
     cnt = max(1, min(n.count, 200))
     gb, days = max(0.0, n.gb), max(0, n.days)
     port = n.port if n.port in ALLOWED_PORTS else 443
     fp = n.fp if n.fp in FPS else ""
     with L:
         if a["max_users"] and db.execute("SELECT COUNT(*) c FROM users WHERE owner_id=?", (a["id"],)).fetchone()["c"] + cnt > a["max_users"]:
-            raise HTTPException(403, "به سقف تعداد کاربر حسابت رسیدی")
+            raise HTTPException(403, "You reached the user limit of your account")
         if a["max_gb"]:
             if gb <= 0:
-                raise HTTPException(400, "برای این حساب باید حجم مشخص کنی")
+                raise HTTPException(400, "This account requires you to set a volume")
             if used_bytes(a["id"]) + cnt * int(gb * GB) > a["max_gb"] * GB:
-                raise HTTPException(403, "از سقف حجم حسابت بیشتر می‌شه")
+                raise HTTPException(403, "This would exceed the volume limit of your account")
         ids = []
         for i in range(cnt):
             name = (n.name.strip() or "user")[:64]
@@ -558,7 +531,7 @@ def add_user(n: NewUser, a=Depends(auth)):
             uid_ = str(uuid.uuid4())
             if cnt == 1 and n.uuid:
                 try: uid_ = str(uuid.UUID(n.uuid))
-                except ValueError: raise HTTPException(400, "UUID نامعتبره")
+                except ValueError: raise HTTPException(400, "Invalid UUID")
             first = n.first_use and days > 0
             cur = db.execute("INSERT INTO users(name,uuid,token,limit_bytes,expire,note,created,protos,port,fp,ttl_days,enabled,owner_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                              (name, uid_, secrets.token_urlsafe(12), int(gb * GB),
@@ -566,14 +539,14 @@ def add_user(n: NewUser, a=Depends(auth)):
                               clean_protos(n.protos), port, fp, days if first else 0, int(n.enabled), a["id"]))
             ids.append(cur.lastrowid)
         db.commit()
-        st, dom = settings_for(a["id"]), dom_of(a)
+        st, dom = settings_for(a["id"]), req_host(request)
         rows = [db.execute("SELECT * FROM users WHERE id=?", (i,)).fetchone() for i in ids]
         created = [full(r, dom, st["prefix"]) for r in reversed(rows)]
     sync_async()
     return {"ok": True, "users": created, "stats": my_stats(a)}
 
 @app.put("/api/users/{uid}")
-def edit_user(uid: int, e: EditUser, a=Depends(auth)):
+def edit_user(uid: int, e: EditUser, request: Request, a=Depends(auth)):
     with L:
         u = db.execute("SELECT * FROM users WHERE id=? AND owner_id=?", (uid, a["id"])).fetchone()
         if not u:
@@ -596,15 +569,15 @@ def edit_user(uid: int, e: EditUser, a=Depends(auth)):
             f["expire"] = int((max(cur_exp, time.time()) if cur_exp else time.time()) + e.add_days * 86400)
         if "limit_bytes" in f and a["max_gb"]:
             if f["limit_bytes"] == 0:
-                raise HTTPException(400, "برای این حساب باید حجم مشخص کنی")
+                raise HTTPException(400, "This account requires you to set a volume")
             if used_bytes(a["id"], uid) + f["limit_bytes"] > a["max_gb"] * GB:
-                raise HTTPException(403, "از سقف حجم حسابت بیشتر می‌شه")
+                raise HTTPException(403, "This would exceed the volume limit of your account")
         if e.reset: f["up"] = f["down"] = 0
         if f:
             db.execute("UPDATE users SET " + ",".join(f"{k}=?" for k in f) + " WHERE id=?", (*f.values(), uid))
             db.commit()
         row = db.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-        user = full(row, dom_of(a), settings_for(a["id"])["prefix"])
+        user = full(row, req_host(request), settings_for(a["id"])["prefix"])
     sync_async()
     return {"ok": True, "user": user, "stats": my_stats(a)}
 
@@ -620,7 +593,7 @@ def del_user(uid: int, a=Depends(auth)):
 def put_settings(body: dict, a=Depends(auth)):
     with L:
         for k, v in body.items():
-            if k not in APPEARANCE:   # دامنه، عنوان و بقیه‌ی تنظیمات حساس اینجا نادیده گرفته می‌شن
+            if k not in APPEARANCE:   # domain, title and other sensitive settings are ignored here
                 continue
             v = str(v).strip()[:300]
             if k in HEX_KEYS and not re.fullmatch(r"#[0-9a-fA-F]{6}", v): v = APPEARANCE[k]
@@ -632,72 +605,19 @@ def put_settings(body: dict, a=Depends(auth)):
         db.commit()
     return {"ok": True}
 
-# ------------------------- مدیریت حساب‌ها (فقط مالک) -------------------------
-class AccEdit(BaseModel):
-    status: Optional[str] = None
-    max_users: Optional[int] = None
-    max_gb: Optional[float] = None
-    domain: Optional[str] = None
+# ------------------------- account management (owner only) -------------------------
+@app.get("/healthz")
+def healthz():
+    return Response("ok", media_type="text/plain")
 
-@app.get("/api/accounts")
-def accounts(a=Depends(owner_only)):
-    with L:
-        out = []
-        for r in db.execute("SELECT * FROM accounts ORDER BY id").fetchall():
-            us = db.execute("SELECT up, down FROM users WHERE owner_id=?", (r["id"],)).fetchall()
-            out.append({"id": r["id"], "email": r["email"], "role": r["role"], "status": r["status"], "max_users": r["max_users"],
-                        "max_gb": r["max_gb"], "domain": r["domain"], "users": len(us), "traffic": sum(x["up"] + x["down"] for x in us)})
-    return {"accounts": out}
-
-@app.put("/api/accounts/{aid}")
-def acc_edit(aid: int, e: AccEdit, a=Depends(owner_only)):
-    with L:
-        r = db.execute("SELECT * FROM accounts WHERE id=?", (aid,)).fetchone()
-        if not r or r["role"] == "owner":
-            raise HTTPException(404)
-        f = {}
-        if e.status is not None:
-            if e.status not in ("active", "pending", "blocked"):
-                raise HTTPException(400, "وضعیت نامعتبره")
-            f["status"] = e.status
-        if e.max_users is not None: f["max_users"] = max(0, e.max_users)
-        if e.max_gb is not None: f["max_gb"] = max(0.0, e.max_gb)
-        if e.domain is not None:
-            d = re.sub(r"^https?://", "", e.domain.strip().lower()).split("/")[0]
-            if d and not re.fullmatch(r"[a-z0-9.-]{3,253}", d):
-                raise HTTPException(400, "دامنه نامعتبره")
-            f["domain"] = d
-        if f:
-            db.execute("UPDATE accounts SET " + ",".join(f"{k}=?" for k in f) + " WHERE id=?", (*f.values(), aid))
-            db.commit()
-    if f.get("status", "active") != "active":
-        drop_sessions(aid)
-    sync_async()
-    return {"ok": True}
-
-@app.delete("/api/accounts/{aid}")
-def acc_del(aid: int, a=Depends(owner_only)):
-    with L:
-        r = db.execute("SELECT role FROM accounts WHERE id=?", (aid,)).fetchone()
-        if not r or r["role"] == "owner":
-            raise HTTPException(404)
-        db.execute("DELETE FROM users WHERE owner_id=?", (aid,))
-        db.execute("DELETE FROM account_settings WHERE account_id=?", (aid,))
-        db.execute("DELETE FROM accounts WHERE id=?", (aid,))
-        db.commit()
-    drop_sessions(aid)
-    sync_async()
-    return {"ok": True}
-
-# ------------------------- ساب و صفحه‌ها -------------------------
 @app.get("/sub/{token}")
-def sub(token: str):
+def sub(token: str, request: Request):
     with L:
         u = db.execute("SELECT * FROM users WHERE token=?", (token,)).fetchone()
         acc = db.execute("SELECT * FROM accounts WHERE id=?", (u["owner_id"],)).fetchone() if u else None
     if not u or not acc or acc["status"] != "active":
         raise HTTPException(404)
-    lk = links(u, dom_of(acc), settings_for(acc["id"])["prefix"])
+    lk = links(u, req_host(request), settings_for(acc["id"])["prefix"])
     h = {"subscription-userinfo": f"upload={u['up']}; download={u['down']}; total={u['limit_bytes']}; expire={u['expire']}",
          "profile-update-interval": "1", "Cache-Control": "no-store",
          "profile-title": "base64:" + base64.b64encode(TITLE.encode()).decode()}
@@ -724,30 +644,25 @@ def admin(request: Request):
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page():
-    return LOGIN.replace("__TITLE__", TITLE).replace("__SIGNUP__", "1" if ALLOW_SIGNUP else "0")
+    return LOGIN.replace("__TITLE__", TITLE)
 
-LOGIN = """<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">
+LOGIN = """<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>__TITLE__</title>
 <style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,Tahoma,sans-serif;
 background:radial-gradient(900px 500px at 80% -10%,#4b34c4 0,transparent 60%),radial-gradient(700px 500px at 0 110%,#0f6e8c 0,transparent 55%),#0a0c13;color:#eef0f8}
-.b{width:min(380px,92vw);padding:26px;border-radius:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(18px);animation:fu .6s both}
+.b{width:min(360px,92vw);padding:28px;border-radius:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(18px);animation:fu .6s both}
 @keyframes fu{from{opacity:0;transform:translateY(18px)}}
-h2{margin:0 0 14px;text-align:center;font-size:24px;letter-spacing:.5px}
-.tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button{flex:1;margin:0;padding:10px;border-radius:12px;background:rgba(255,255,255,.06);color:#9aa3bd;font-size:14px}
-.tabs button.on{background:linear-gradient(135deg,#7c5cff,#38d4ff);color:#fff}
+h2{margin:0 0 4px}p{margin:0 0 18px;color:#9aa3bd;font-size:14px}
 input{width:100%;padding:13px 14px;margin:6px 0;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.3);color:#fff;font-size:15px}
-button{width:100%;margin-top:10px;padding:13px;border:0;border-radius:12px;background:linear-gradient(135deg,#7c5cff,#38d4ff);color:#fff;font-size:16px;font-weight:700;cursor:pointer}
-button:hover{filter:brightness(1.12)}#e{font-size:13px;min-height:18px;margin-top:8px;text-align:center}</style></head><body>
-<form class="b" onsubmit="go(event)"><h2>👑 __TITLE__</h2>
-<div class="tabs"><button type="button" id="t1" class="on" onclick="tab(1)">ورود</button><button type="button" id="t2" onclick="tab(2)">ثبت‌نام</button></div>
-<input id="u" placeholder="ایمیل" autocomplete="username" autocapitalize="none"><input id="p" type="password" placeholder="رمز عبور" autocomplete="current-password">
-<button id="sb">ورود</button><div id="e"></div></form>
-<script>let reg=false;const H={'Content-Type':'application/json','X-Requested-With':'panel'};
-if(__SIGNUP__!=1)t2.style.display='none';
-function tab(n){reg=n==2;t1.className=reg?'':'on';t2.className=reg?'on':'';sb.textContent=reg?'ساخت حساب':'ورود';e.textContent=''}
-async function go(ev){ev.preventDefault();e.style.color='#ff6b7a';const r=await fetch(reg?'/register':'/login',{method:'POST',headers:H,body:JSON.stringify({email:u.value,password:p.value})});
-let j={};try{j=await r.json()}catch(x){}
-if(r.ok){if(reg){e.style.color='#35d68a';e.textContent=j.pending?'ثبت شد؛ بعد از تأیید مالک می‌تونی وارد بشی':'ثبت شد؛ حالا وارد شو';tab(1)}else location='/admin'}
-else e.textContent=j.detail||'خطا ('+r.status+')'}</script></body></html>"""
+button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;background:linear-gradient(135deg,#7c5cff,#38d4ff);color:#fff;font-size:16px;font-weight:700}
+button:hover{filter:brightness(1.12)}#e{color:#ff6b7a;font-size:13px;min-height:18px;margin-top:8px}</style></head><body>
+<form class="b" onsubmit="go(event)"><h2>🔐 __TITLE__</h2><p>Sign in to continue</p>
+<input id="u" placeholder="Username" autocomplete="username" autocapitalize="none"><input id="p" type="password" placeholder="Password" autocomplete="current-password">
+<label style="font-size:13px;color:#9aa3bd;display:block;margin-top:4px"><input type="checkbox" style="width:auto;margin:6px" onchange="p.type=this.checked?'text':'password'">Show password</label>
+<button>Sign in</button><div id="e"></div></form>
+<script>async function go(ev){ev.preventDefault();e.textContent='';let r,j={};
+try{r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'panel'},body:JSON.stringify({username:u.value,password:p.value})});
+try{j=await r.json()}catch(x){}}catch(x){e.textContent='Network error';return}
+if(r.ok)location='/admin';else e.textContent=j.detail||'Error ('+r.status+')'}</script></body></html>"""
 
 bootstrap_owner()
