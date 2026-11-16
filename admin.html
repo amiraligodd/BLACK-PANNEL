@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="fa" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>پنل مدیریت</title>
+<title>Admin Panel</title>
 <style>
 :root{--a:#7c5cff;--a2:#38d4ff;--r:16px;--fs:15px;--bl:14px;--pad:14px;--avr:13px}
 [data-t=dark]{--bg:#0a0c13;--c:rgba(255,255,255,.055);--c2:rgba(255,255,255,.09);--t:#eef0f8;--m:#8d95b0;--b:rgba(255,255,255,.1);--in:rgba(0,0,0,.28)}
@@ -33,7 +33,7 @@ header h1{font-size:20px;margin:0;flex:1;font-weight:800}
 .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 @media(min-width:640px){.stats{grid-template-columns:repeat(4,1fr)}}
 .st{padding:14px}.st small{color:var(--m);font-size:12px}.st b{display:block;font-size:22px;margin-top:4px}
-.st i{font-style:normal;float:left;font-size:20px;opacity:.9}
+.st i{font-style:normal;float:right;font-size:20px;opacity:.9}
 .bar{display:flex;gap:8px;margin:14px 0 8px}
 input,select,textarea{width:100%;padding:12px 13px;border-radius:12px;border:1px solid var(--b);background:var(--in);color:var(--t);font-size:15px;font-family:inherit}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--a);outline-offset:-1px}
@@ -53,7 +53,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--a);outline-offse
 .btn{flex:1;min-width:64px;padding:9px 6px;border-radius:11px;border:1px solid var(--b);background:var(--c2);color:var(--t);font-size:13px;cursor:pointer;font-family:inherit}
 .btn.p{background:linear-gradient(135deg,var(--a),var(--a2));border-color:transparent;color:#fff;font-weight:700}
 .btn.d{color:#ff7a80}
-.fab{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:18px;height:56px;padding:0 22px;border-radius:99px;border:0;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-size:16px;font-weight:800;box-shadow:0 10px 30px color-mix(in srgb,var(--a) 55%,transparent);cursor:pointer}
+.fab{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));right:18px;height:56px;padding:0 22px;border-radius:99px;border:0;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-size:16px;font-weight:800;box-shadow:0 10px 30px color-mix(in srgb,var(--a) 55%,transparent);cursor:pointer}
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:20;backdrop-filter:blur(4px)}
 .mo.on{display:flex}
 .sh{width:min(520px,100%);max-height:92vh;overflow:auto;background:var(--bg);border:1px solid var(--b);border-radius:24px 24px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom))}
@@ -94,7 +94,7 @@ body[data-tf=animated] .tt{animation:tx 4s linear infinite}
 .btn,.chip,.ic{transition:transform .15s,filter .2s}
 .btn:active,.chip:active,.ic:active,.fab:active{transform:scale(.95)}
 .btn:hover,.chip:hover,.ic:hover{filter:brightness(1.15)}
-.tag.ok::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-left:5px;animation:pd 1.6s infinite}
+.tag.ok::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;animation:pd 1.6s infinite}
 @keyframes pd{50%{opacity:.25}}
 .mo.on .sh{animation:shu .38s cubic-bezier(.2,1.2,.4,1)}
 @keyframes shu{from{transform:translateY(40px) scale(.97);opacity:0}}
@@ -126,13 +126,13 @@ header{position:sticky;top:0;z-index:15;margin:-14px -14px 12px;padding:12px 14p
 .pt,.tp{padding:11px;border:1.5px solid var(--b);border-radius:14px;cursor:pointer;background:var(--in);transition:.2s;position:relative}
 .pt b,.tp b{display:block}.pt small,.tp small{color:var(--m);font-size:11.5px}
 .pt.on{border-color:var(--a);background:color-mix(in srgb,var(--a) 15%,transparent)}
-.pt.on::after{content:"✓";position:absolute;top:6px;left:9px;color:var(--a);font-weight:900}
+.pt.on::after{content:"✓";position:absolute;top:6px;right:9px;color:var(--a);font-weight:900}
 .tp{background:linear-gradient(135deg,color-mix(in srgb,var(--a) 18%,transparent),transparent)}.tp:active,.pt:active{transform:scale(.96)}
 .lk2{padding:15px 8px;border-radius:14px;color:#fff;font-weight:800;text-align:center;cursor:pointer;font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,.45);transition:.2s}.lk2:hover{transform:scale(1.05)}
 .rw{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0}
 .sw2{width:48px;height:27px;border-radius:99px;background:var(--in);border:1px solid var(--b);position:relative;cursor:pointer;flex:none;transition:.25s}
-.sw2 i{position:absolute;top:2px;right:2px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.25s}
-.sw2.on{background:var(--a)}.sw2.on i{right:24px}
+.sw2 i{position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.25s}
+.sw2.on{background:var(--a)}.sw2.on i{left:24px}
 .big{font-size:22px;font-weight:800;text-align:center}
 input[type=range]{accent-color:var(--a);padding:0;margin-top:8px}
 .stk{position:sticky;bottom:-18px;margin:14px -18px -18px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 38%)}
@@ -148,27 +148,26 @@ input[type=range]{accent-color:var(--a);padding:0;margin-top:8px}
 <canvas id="fx"></canvas><div id="grain"></div>
 <div class="w">
   <header>
-    <h1 id="ttl">🛰️ پنل مدیریت</h1>
-    <button class="ic" id="bacc" onclick="openAcc()" title="مدیریت حساب‌ها" style="display:none">👑</button>
-    <button class="ic" onclick="openSet()" title="تنظیمات">⚙️</button>
-    <button class="ic" onclick="location='/logout'" title="خروج">🚪</button>
+    <h1 id="ttl">🛰️ Admin Panel</h1>
+    <button class="ic" onclick="openSet()" title="Settings">⚙️</button>
+    <button class="ic" onclick="location='/logout'" title="Logout">🚪</button>
   </header>
 
   <div class="stats">
-    <div class="card st ani"><i>👥</i><small>کل کاربران</small><b id="s1">–</b></div>
-    <div class="card st ani"><i>✅</i><small>فعال</small><b id="s2">–</b></div>
-    <div class="card st ani"><i>📊</i><small>کل مصرف</small><b id="s3">–</b></div>
-    <div class="card st ani"><i>🖥️</i><small>رم / بار سرور</small><b id="s4" style="font-size:17px">–</b></div>
+    <div class="card st ani"><i>👥</i><small>Total users</small><b id="s1">–</b></div>
+    <div class="card st ani"><i>✅</i><small>Active</small><b id="s2">–</b></div>
+    <div class="card st ani"><i>📊</i><small>Total usage</small><b id="s3">–</b></div>
+    <div class="card st ani"><i>🖥️</i><small>RAM / server load</small><b id="s4" style="font-size:17px">–</b></div>
   </div>
 
   <div id="meb" style="color:var(--m);font-size:12.5px;margin:8px 2px 0"></div>
   <div id="errb" class="ats" style="margin-top:10px"></div>
-  <div class="bar"><input id="q" placeholder="🔎 جستجوی کاربر یا یادداشت..." oninput="render()"></div>
+  <div class="bar"><input id="q" placeholder="🔎 Search users or notes..." oninput="render()"></div>
   <div class="chips" id="chips"></div>
   <div id="list"></div>
 </div>
 
-<button class="fab" onclick="openUser()">＋ کاربر جدید</button>
+<button class="fab" onclick="openUser()">＋ New user</button>
 
 <!-- user modal -->
 <div class="mo" id="mu" onclick="if(event.target===this)cl('mu')"><div class="sh" id="mub"></div></div>
@@ -176,20 +175,19 @@ input[type=range]{accent-color:var(--a);padding:0;margin-top:8px}
 <div class="mo" id="mq" onclick="if(event.target===this)cl('mq')"><div class="sh" id="mqb" style="text-align:center"></div></div>
 <div class="mo" id="ms" onclick="if(event.target===this)closeSet()"><div class="sh" id="sb"></div></div>
 <div class="mo" id="mc"><div class="sh" id="mcb"></div></div>
-<div class="mo" id="mac" onclick="if(event.target===this)cl('mac')"><div class="sh" id="mab"></div></div>
 <div id="toast"></div>
 
 <script>
 const $=id=>document.getElementById(id);
 const api=async(m,u,b)=>{const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json','X-Requested-With':'panel'},body:b?JSON.stringify(b):undefined});
  if(r.status===401){location='/login';throw 0}
- try{return await r.json()}catch(e){return{detail:'خطای سرور ('+r.status+')'}}};
+ try{return await r.json()}catch(e){return{detail:'Server error ('+r.status+')'}}};
 const GB=1073741824,fb=x=>x>=GB?(x/GB).toFixed(2)+' GB':(x/1048576).toFixed(1)+' MB';
 const COLORS=['#7c5cff','#3b82f6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#a855f7'];
 let users=[],S={},filt='all',editId=null,qs='',qv='';
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1800)}
 function cl(id){$(id).classList.remove('on')}
-async function cp(t){try{await navigator.clipboard.writeText(t)}catch(e){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove()}toast('✅ کپی شد')}
+async function cp(t){try{await navigator.clipboard.writeText(t)}catch(e){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove()}toast('✅ Copied')}
 
 const FONTS={system:'system-ui,Tahoma,sans-serif',vazir:'Vazirmatn,Tahoma,sans-serif',tahoma:'Tahoma,sans-serif',mono:'ui-monospace,Menlo,Consolas,monospace'};
 const PAL={amoled:['#000000','#f2f2f7','#8a8a93','rgba(255,255,255,.1)','dark'],nord:['#2e3440','#eceff4','#9aa5b8','rgba(255,255,255,.12)','dark'],dracula:['#1e1f29','#f8f8f2','#9aa0c0','rgba(255,255,255,.12)','dark'],abyss:['#04121f','#e6f4ff','#7fa3bf','rgba(120,190,255,.16)','dark'],wine:['#160a12','#fbeaf1','#b08a9b','rgba(255,150,190,.15)','dark'],forest:['#07140d','#e7f7ec','#86a893','rgba(120,255,170,.14)','dark'],paper:['#f7f5ef','#1d1b16','#6f6a5c','#e5e0d2','light'],sand:['#f6efe6','#2a2118','#7a6a58','#e6d9c6','light'],mint:['#eefaf5','#10281f','#5c7d6f','#d3ece1','light']};
@@ -232,41 +230,40 @@ const PN={vmess:'VMess',vless:'VLESS',trojan:'Trojan',vlessh:'VLESS-HU'};
 function render(){const an=!window._r;window._r=1;
  const q=$('q').value.trim().toLowerCase(),now=Date.now()/1000;
  const F={all:u=>1,active:u=>u.active,expired:u=>u.expire&&u.expire<now,off:u=>!u.enabled,full:u=>u.limit_bytes&&u.up+u.down>=u.limit_bytes};
- const N={all:'همه',active:'فعال',expired:'منقضی',full:'حجم تمام',off:'غیرفعال'};
+ const N={all:'All',active:'Active',expired:'Expired',full:'Volume used up',off:'Disabled'};
  $('chips').innerHTML=Object.keys(N).map(k=>`<div class="chip ${filt===k?'on':''}" onclick="filt='${k}';render()">${N[k]} (${users.filter(F[k]).length})</div>`).join('');
  const L=users.filter(F[filt]).filter(u=>!q||(u.name+' '+u.note).toLowerCase().includes(q));
  $('list').innerHTML=L.length?L.map((u,i)=>{
   const used=u.up+u.down,p=u.limit_bytes?Math.min(100,used/u.limit_bytes*100):0;
   const col=p<70?'#22c55e':p<90?'#f59e0b':'#ef4444';
   const days=u.expire?Math.ceil((u.expire-now)/86400):null;
-  const exp=u.ttl_days&&!u.expire?'⏳ از اولین اتصال ('+u.ttl_days+' روز)':days===null?'♾️ نامحدود':days<=0?'⛔ منقضی شده':days+' روز مانده';
-  const tag=!u.enabled?['off','غیرفعال']:u.active?['ok','فعال']:['no','تمام شده'];
+  const exp=u.ttl_days&&!u.expire?'⏳ from first connection ('+u.ttl_days+' days)':days===null?'♾️ Unlimited':days<=0?'⛔ Expired':days+' days left';
+  const tag=!u.enabled?['off','Disabled']:u.active?['ok','Active']:['no','Used up'];
   return `<div class="card u ${an?'ani':''}" style="--i:${Math.min(i,12)}"><div class="top"><div class="av">${esc(u.name[0]||'?')}</div>
   <div class="nm"><b>${esc(u.name)}</b><small>${u.protos.split(',').map(p=>PN[p]||p).join(' · ')} · ${u.port}${u.note?' · '+esc(u.note):''}</small></div><span class="tag ${tag[0]}">${tag[1]}</span></div>
   <div class="pb"><div style="width:${u.limit_bytes?p:100}%;background:${barBg(col)};${u.limit_bytes?'':'opacity:.35'}"></div></div>
   <div class="meta"><span>${fb(used)} / ${u.limit_bytes?fb(u.limit_bytes):'♾️'}</span><span>${exp}</span></div>
   <div class="meta" style="margin-top:3px"><span>↑ ${fb(u.up)}</span><span>↓ ${fb(u.down)}</span></div>
-  <div class="act"><button class="btn p" onclick="qr(${u.id})">📲 لینک</button>
-  <button class="btn" onclick="cp(location.origin+'/sub/${u.token}')">🔗 ساب</button>
+  <div class="act"><button class="btn p" onclick="qr(${u.id})">📲 Links</button>
+  <button class="btn" onclick="cp(location.origin+'/sub/${u.token}')">🔗 Sub</button>
   <button class="btn" onclick="openUser(${u.id})">✏️</button>
   <button class="btn" onclick="up(${u.id},{enabled:${!u.enabled}})">${u.enabled?'⏸':'▶️'}</button>
-  <button class="btn" onclick="ask('مصرف صفر شود؟','ریست').then(y=>y&&up(${u.id},{reset:true}))">♻️</button>
-  <button class="btn d" onclick="rm(${u.id})">🗑</button></div></div>`}).join(''):'<div class="empty"><div style="font-size:54px">🛰️</div><p>'+(users.length?'کاربری با این فیلتر پیدا نشد':'هنوز کاربری نساختی')+'</p><button class="btn p" style="flex:none;padding:10px 24px" onclick="openUser()">＋ ساخت کاربر</button></div>'}
+  <button class="btn" onclick="ask('Reset usage to zero?','Reset').then(y=>y&&up(${u.id},{reset:true}))">♻️</button>
+  <button class="btn d" onclick="rm(${u.id})">🗑</button></div></div>`}).join(''):'<div class="empty"><div style="font-size:54px">🛰️</div><p>'+(users.length?'No users match this filter':'You have no users yet')+'</p><button class="btn p" style="flex:none;padding:10px 24px" onclick="openUser()">＋ Create user</button></div>'}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 let ME={},LT=0;
 async function load(){const d=await api('GET','/api/all');if(d.detail)return;ME=d.me;users=d.users;S=d.settings;applyTheme();render();stats(d.stats)}
 function stats(s){$('s1').textContent=s.users;$('s2').textContent=s.active;$('s3').textContent=fb(s.traffic);
  $('s4').textContent=s.ram_total?Math.round(s.ram_used/s.ram_total*100)+'% · '+s.load.toFixed(2):'–';
- const eb=$('errb');eb.className='ats'+(s.xray_err?' bad':s.applying?' run':'');eb.textContent=s.xray_err||(s.applying?'⏳ در حال اعمال تغییرات روی سرور...':'');
- $('meb').textContent='👤 '+ME.email+(ME.max_users?' · کاربر '+users.length+' از '+ME.max_users:'')+(ME.max_gb?' · سهمیه حجم '+fb(users.reduce((a,u)=>a+u.limit_bytes,0))+' از '+ME.max_gb+' GB':'');
- $('bacc').style.display=ME.role==='owner'?'':'none';
+ const eb=$('errb');eb.className='ats'+(s.xray_err?' bad':s.applying?' run':'');eb.textContent=s.xray_err||(s.applying?'⏳ Applying changes on the server...':'');
+ $('meb').textContent='👤 '+ME.email+(ME.max_users?' · users '+users.length+' of '+ME.max_users:'')+(ME.max_gb?' · volume quota '+fb(users.reduce((a,u)=>a+u.limit_bytes,0))+' of '+ME.max_gb+' GB':'');
  clearTimeout(LT);if(s.applying)LT=setTimeout(load,1800)}
 
-const PROTOS=[['vmess','VMess','🔷','سازگار با اکثر اپ‌ها'],['vless','VLESS','⚡','پروتکل سبک و مدرن'],['trojan','Trojan','🛡️','شبیه ترافیک HTTPS'],['vlessh','VLESS-HU','🚀','انتقال HTTPUpgrade']];
-const FPS=[['','پیش‌فرض'],['android','android'],['chrome','chrome'],['firefox','firefox'],['safari','safari'],['ios','ios'],['random','random']];
+const PROTOS=[['vmess','VMess','🔷','Compatible with most apps'],['vless','VLESS','⚡','Light and modern protocol'],['trojan','Trojan','🛡️','Looks like HTTPS'],['vlessh','VLESS-HU','🚀','Transport HTTPUpgrade']];
+const FPS=[['','Default'],['android','android'],['chrome','chrome'],['firefox','firefox'],['safari','safari'],['ios','ios'],['random','random']];
 const PORTS=[['443','443 TLS'],['8443','8443'],['2053','2053'],['2096','2096']];
-const TPL=[['🧪','تست','۱ گیگ · ۱ روز',1,1],['📅','ماهانه','۵۰ گیگ · ۳۰ روز',50,30],['💎','سه‌ماهه','۱۵۰ گیگ · ۹۰ روز',150,90],['♾️','نامحدود','بدون حجم و زمان',0,0]];
+const TPL=[['🧪','Test','1 GB · 1 day',1,1],['📅','Monthly','50 GB · 30 days',50,30],['💎','Quarterly','150 GB · 90 days',150,90],['♾️','Unlimited','No volume or time limit',0,0]];
 const chip=(g,v,t,on)=>`<div class="chip ${on?'on':''}" data-g="${g}" data-v="${v}" onclick="tg(this)">${t}</div>`;
 const gv=g=>[...document.querySelectorAll(`#mub [data-g=${g}].on`)].map(x=>x.dataset.v);
 function tg(e){const g=e.dataset.g;if(['proto','first','en'].includes(g))e.classList.toggle('on');else{document.querySelectorAll(`#mub [data-g=${g}]`).forEach(x=>x.classList.remove('on'));e.classList.add('on')}sum()}
@@ -275,103 +272,103 @@ const rnd=()=>Math.random().toString(36).slice(2,8);
 const qc=(id,arr,suf)=>`<div class="chips wrap" style="margin-top:8px">${arr.map(x=>`<div class="chip" onclick="setv('${id}',${x})">${x?x+suf:'♾️'}</div>`).join('')}</div>`;
 const swc=(g,on,t)=>`<div class="rw"><span>${t}</span><div class="sw2 ${on?'on':''}" data-g="${g}" data-v="1" onclick="tg(this)"><i></i></div></div>`;
 function sum(){if(!$('sum'))return;const gb=+$('fg').value||0,d=+$('fd').value||0,P=gv('proto'),first=gv('first').length,n=+($('fc')?$('fc').value:1)||1;
- const ex=d?(first?'⏳ '+d+' روز از اولین اتصال':new Date(Date.now()+d*864e5).toLocaleDateString('fa-IR')):'♾️ نامحدود';
- $('sum').innerHTML=`<div><b>${P.length}</b><small>پروتکل</small></div><div><b>${gb?gb+' GB':'♾️'}</b><small>حجم</small></div><div><b>${d?d+' روز':'♾️'}</b><small>مدت</small></div><div><b>${gv('port')[0]||443}</b><small>پورت</small></div><div class="wide"><small>انقضا: ${ex}${n>1?' · ساخت '+n+' کاربر':''}</small></div>`}
+ const ex=d?(first?'⏳ '+d+' days from first connection':new Date(Date.now()+d*864e5).toLocaleDateString('en-GB')):'♾️ Unlimited';
+ $('sum').innerHTML=`<div><b>${P.length}</b><small>Protocols</small></div><div><b>${gb?gb+' GB':'♾️'}</b><small>Volume</small></div><div><b>${d?d+' days':'♾️'}</b><small>Duration</small></div><div><b>${gv('port')[0]||443}</b><small>Port</small></div><div class="wide"><small>Expires: ${ex}${n>1?' · creating '+n+' users':''}</small></div>`}
 function openUser(id){editId=id||null;const u=users.find(x=>x.id===id),E=!!u,ps=E?u.protos.split(','):['vmess'];
  const gb0=E?+(u.limit_bytes/GB).toFixed(2):0,d0=E&&u.expire?Math.max(0,Math.ceil((u.expire-Date.now()/1000)/86400)):0;
- $('mub').innerHTML=`<div class="mh"><div class="mi">${E?'✏️':'✨'}</div><div><h3>${E?'ویرایش کاربر':'ساخت کانفیگ جدید'}</h3><small>${E?esc(u.name):'همه‌چیز رو قبل از ساخت تنظیم کن'}</small></div><button class="x" onclick="cl('mu')">✕</button></div>
+ $('mub').innerHTML=`<div class="mh"><div class="mi">${E?'✏️':'✨'}</div><div><h3>${E?'Edit user':'Create new config'}</h3><small>${E?esc(u.name):'Set everything up before creating'}</small></div><button class="x" onclick="cl('mu')">✕</button></div>
  <div class="sumc" id="sum"></div>
- ${E?'':`<div class="sec"><h4>⚡ قالب‌های آماده</h4><div class="tpls">${TPL.map(t=>`<div class="tp" onclick="setv('fg',${t[3]});setv('fd',${t[4]})"><b>${t[0]} ${t[1]}</b><small>${t[2]}</small></div>`).join('')}</div></div>`}
- <div class="sec"><h4>👤 هویت</h4><div class="row"><input id="fn" placeholder="نام کاربر" value="${E?esc(u.name):''}"><button class="btn" style="flex:0 0 52px" onclick="$('fn').value='user-'+rnd()">🎲</button></div>
- <textarea id="fnote" rows="2" placeholder="یادداشت (اختیاری)" style="margin-top:8px">${E?esc(u.note):''}</textarea></div>
- <div class="sec"><h4>🔌 پروتکل‌ها (چندتایی)</h4><div class="ptiles">${PROTOS.map(([v,t,ic,ds])=>`<div class="pt ${ps.includes(v)?'on':''}" data-g="proto" data-v="${v}" onclick="tg(this)"><b>${ic} ${t}</b><small>${ds}</small></div>`).join('')}</div></div>
- <div class="sec"><h4>📦 حجم (GB) — ۰ = نامحدود</h4><input id="fg" class="big" type="number" min="0" step="any" value="${gb0}"><input id="rfg" type="range" min="0" max="500" value="${Math.min(gb0,500)}">${qc('fg',[1,5,10,20,50,100,0],' GB')}</div>
- <div class="sec"><h4>⏱️ مدت (روز) — ۰ = نامحدود</h4><input id="fd" class="big" type="number" min="0" value="${d0}"><input id="rfd" type="range" min="0" max="365" value="${Math.min(d0,365)}">${qc('fd',[1,7,30,60,90,180,0],' روز')}
- ${E?'':swc('first',false,'⏳ شروع زمان از اولین اتصال')}</div>
- <div class="sec"><h4>🌐 اتصال</h4><div class="chips wrap">${PORTS.map(([v,t])=>chip('port',v,t,String(E?u.port:443)===v)).join('')}</div>
+ ${E?'':`<div class="sec"><h4>⚡ Templates</h4><div class="tpls">${TPL.map(t=>`<div class="tp" onclick="setv('fg',${t[3]});setv('fd',${t[4]})"><b>${t[0]} ${t[1]}</b><small>${t[2]}</small></div>`).join('')}</div></div>`}
+ <div class="sec"><h4>👤 Identity</h4><div class="row"><input id="fn" placeholder="User name" value="${E?esc(u.name):''}"><button class="btn" style="flex:0 0 52px" onclick="$('fn').value='user-'+rnd()">🎲</button></div>
+ <textarea id="fnote" rows="2" placeholder="Note (optional)" style="margin-top:8px">${E?esc(u.note):''}</textarea></div>
+ <div class="sec"><h4>🔌 Protocols (multi-select)</h4><div class="ptiles">${PROTOS.map(([v,t,ic,ds])=>`<div class="pt ${ps.includes(v)?'on':''}" data-g="proto" data-v="${v}" onclick="tg(this)"><b>${ic} ${t}</b><small>${ds}</small></div>`).join('')}</div></div>
+ <div class="sec"><h4>📦 Volume (GB) — 0 = unlimited</h4><input id="fg" class="big" type="number" min="0" step="any" value="${gb0}"><input id="rfg" type="range" min="0" max="500" value="${Math.min(gb0,500)}">${qc('fg',[1,5,10,20,50,100,0],' GB')}</div>
+ <div class="sec"><h4>⏱️ Duration (days) — 0 = unlimited</h4><input id="fd" class="big" type="number" min="0" value="${d0}"><input id="rfd" type="range" min="0" max="365" value="${Math.min(d0,365)}">${qc('fd',[1,7,30,60,90,180,0],' days')}
+ ${E?'':swc('first',false,'⏳ Start the timer on first connection')}</div>
+ <div class="sec"><h4>🌐 Connection</h4><div class="chips wrap">${PORTS.map(([v,t])=>chip('port',v,t,String(E?u.port:443)===v)).join('')}</div>
  <label>Fingerprint</label><div class="chips wrap">${FPS.map(([v,t])=>chip('fp',v,t,(E?u.fp:'')===v)).join('')}</div>
  </div>
- <div class="sec"><h4>⚙️ پیشرفته</h4>${swc('en',E?!!u.enabled:true,'✅ فعال')}
- ${E?`<label>افزودن سریع</label><div class="act" style="margin-top:0"><button class="btn" onclick="quick({add_days:30})">+۳۰ روز</button><button class="btn" onclick="quick({add_gb:10})">+۱۰ گیگ</button><button class="btn" onclick="quick({add_gb:50})">+۵۰ گیگ</button></div>`:`<label>تعداد (ساخت گروهی)</label><div class="row"><button class="btn" onclick="setv('fc',Math.max(1,+$('fc').value-1))">−</button><input id="fc" type="number" value="1" min="1" max="200" style="text-align:center"><button class="btn" onclick="setv('fc',Math.min(200,+$('fc').value+1))">＋</button></div>
- <label>UUID دلخواه (خالی = خودکار)</label><div class="row"><input id="fu" dir="ltr"><button class="btn" style="flex:0 0 52px" onclick="$('fu').value=crypto.randomUUID()">🎲</button></div>`}</div>
- <div class="act stk"><button class="btn p" onclick="saveUser()">${E?'💾 ذخیره':'🚀 ساخت کانفیگ'}</button><button class="btn" onclick="cl('mu')">بستن</button></div>`;
+ <div class="sec"><h4>⚙️ Advanced</h4>${swc('en',E?!!u.enabled:true,'✅ Active')}
+ ${E?`<label>Quick add</label><div class="act" style="margin-top:0"><button class="btn" onclick="quick({add_days:30})">+30 days</button><button class="btn" onclick="quick({add_gb:10})">+10 GB</button><button class="btn" onclick="quick({add_gb:50})">+50 GB</button></div>`:`<label>Count (bulk create)</label><div class="row"><button class="btn" onclick="setv('fc',Math.max(1,+$('fc').value-1))">−</button><input id="fc" type="number" value="1" min="1" max="200" style="text-align:center"><button class="btn" onclick="setv('fc',Math.min(200,+$('fc').value+1))">＋</button></div>
+ <label>Custom UUID (empty = automatic)</label><div class="row"><input id="fu" dir="ltr"><button class="btn" style="flex:0 0 52px" onclick="$('fu').value=crypto.randomUUID()">🎲</button></div>`}</div>
+ <div class="act stk"><button class="btn p" onclick="saveUser()">${E?'💾 Save':'🚀 Create config'}</button><button class="btn" onclick="cl('mu')">Close</button></div>`;
  $('mub').oninput=e=>{const t=e.target;if(t.id==='fg'||t.id==='fd'){const r=$('r'+t.id);if(r)r.value=t.value}if(t.id==='rfg'||t.id==='rfd')$(t.id.slice(1)).value=t.value;sum()};
  $('mu').classList.add('on');$('mub').scrollTop=0;sum()}
 async function saveUser(){const E=!!editId,b={name:($('fn').value||'user').slice(0,64),gb:+$('fg').value||0,days:+$('fd').value||0,note:$('fnote').value.slice(0,200),
  protos:gv('proto'),port:+(gv('port')[0]||443),fp:gv('fp')[0]||'',enabled:!!gv('en').length};
- if(!b.protos.length)return toast('⚠️ حداقل یک پروتکل انتخاب کن');
+ if(!b.protos.length)return toast('⚠️ Select at least one protocol');
  if(!E){b.first_use=!!gv('first').length;b.count=+$('fc').value||1;b.uuid=$('fu').value.trim()}
  const r=await api(E?'PUT':'POST',E?'/api/users/'+editId:'/api/users',b);
  if(r.detail)return toast('⚠️ '+r.detail);
  cl('mu');if(E)users=users.map(x=>x.id===r.user.id?r.user:x);else users=[...r.users,...users];
- render();stats(r.stats);toast(E?'✅ ذخیره شد':r.users.length>1?'✅ '+r.users.length+' کانفیگ ساخته شد':'✅ کانفیگ ساخته شد');
+ render();stats(r.stats);toast(E?'✅ Saved':r.users.length>1?'✅ '+r.users.length+' configs created':'✅ Config created');
  if(!E&&r.users.length===1)qr(r.users[0].id)}
-async function quick(b){const r=await api('PUT','/api/users/'+editId,b);if(r.detail)return toast('⚠️ '+r.detail);users=users.map(x=>x.id===r.user.id?r.user:x);cl('mu');render();stats(r.stats);toast('✅ اعمال شد')}
-function ask(msg,ok='تأیید'){return new Promise(res=>{$('mcb').innerHTML=`<div class="mh"><div class="mi">❓</div><h3>${msg}</h3></div><div class="act"><button class="btn p" id="mc_y">${ok}</button><button class="btn" id="mc_n">انصراف</button></div>`;
+async function quick(b){const r=await api('PUT','/api/users/'+editId,b);if(r.detail)return toast('⚠️ '+r.detail);users=users.map(x=>x.id===r.user.id?r.user:x);cl('mu');render();stats(r.stats);toast('✅ Applied')}
+function ask(msg,ok='Confirm'){return new Promise(res=>{$('mcb').innerHTML=`<div class="mh"><div class="mi">❓</div><h3>${msg}</h3></div><div class="act"><button class="btn p" id="mc_y">${ok}</button><button class="btn" id="mc_n">Cancel</button></div>`;
  const f=v=>{cl('mc');res(v)};$('mc_y').onclick=()=>f(true);$('mc_n').onclick=()=>f(false);$('mc').onclick=e=>{if(e.target.id==='mc')f(false)};$('mc').classList.add('on')})}
 async function up(i,b){const u=users.find(x=>x.id===i);if(!u)return;const old={...u};
  if('enabled' in b){u.enabled=b.enabled;u.active=b.enabled&&u.active}if(b.reset){u.up=u.down=0}render();
  const r=await api('PUT','/api/users/'+i,b);if(r.detail){Object.assign(u,old);render();return toast('⚠️ '+r.detail)}
  users=users.map(x=>x.id===i?r.user:x);render();stats(r.stats)}
-async function rm(i){if(!(await ask('این کاربر حذف شود؟','حذف')))return;const old=users;users=users.filter(x=>x.id!==i);render();
+async function rm(i){if(!(await ask('Delete this user?','Delete')))return;const old=users;users=users.filter(x=>x.id!==i);render();
  const r=await api('DELETE','/api/users/'+i);if(r.detail){users=old;render();return toast('⚠️ '+r.detail)}stats(r.stats)}
 let QL=[],QI=0;
 function qr(id){const u=users.find(x=>x.id===id);qs=location.origin+'/sub/'+u.token;QL=[{p:'sub',l:qs},...u.links];
- $('mqb').innerHTML=`<div class="mh"><div class="mi">📲</div><div style="text-align:right"><h3>${esc(u.name)}</h3><small>${fb(u.up+u.down)} / ${u.limit_bytes?fb(u.limit_bytes):'♾️'}</small></div><button class="x" onclick="cl('mq')">✕</button></div>
- <div class="chips wrap" style="justify-content:center" id="qtabs">${QL.map((x,i)=>`<div class="chip" onclick="showT(${i})">${x.p==='sub'?'🔗 ساب':PN[x.p]}</div>`).join('')}</div>
+ $('mqb').innerHTML=`<div class="mh"><div class="mi">📲</div><div style="text-align:left"><h3>${esc(u.name)}</h3><small>${fb(u.up+u.down)} / ${u.limit_bytes?fb(u.limit_bytes):'♾️'}</small></div><button class="x" onclick="cl('mq')">✕</button></div>
+ <div class="chips wrap" style="justify-content:center" id="qtabs">${QL.map((x,i)=>`<div class="chip" onclick="showT(${i})">${x.p==='sub'?'🔗 Sub':PN[x.p]}</div>`).join('')}</div>
  <div id="qr"></div><div class="lk" id="ql"></div>
- <div class="act stk"><button class="btn p" onclick="cp(QL[QI].l)">📋 کپی</button><button class="btn" onclick="shareQ()">📤 اشتراک</button></div>`;
+ <div class="act stk"><button class="btn p" onclick="cp(QL[QI].l)">📋 Copy</button><button class="btn" onclick="shareQ()">📤 Share</button></div>`;
  $('mq').classList.add('on');showT(0)}
 function showT(i){QI=i;document.querySelectorAll('#qtabs .chip').forEach((c,j)=>c.classList.toggle('on',j===i));showQ(QL[i].l)}
 function shareQ(){const t=QL[QI].l;navigator.share?navigator.share({text:t}).catch(()=>{}):cp(t)}
 let qrP;const loadQR=()=>window.QRCode?Promise.resolve():(qrP=qrP||new Promise(r=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';s.onload=r;s.onerror=r;document.head.appendChild(s)}));
 function showQ(t){$('ql').textContent=t;loadQR().then(()=>{$('qr').innerHTML='';if(window.QRCode)new QRCode($('qr'),{text:t,width:210,height:210,correctLevel:QRCode.CorrectLevel.L})})}
 
-const PRE={midnight:['#7c5cff','#38d4ff','نیمه‌شب'],ocean:['#0ea5e9','#22d3ee','اقیانوس'],aurora:['#10b981','#6366f1','شفق'],sunset:['#f97316','#ec4899','غروب'],rose:['#f43f5e','#fb923c','رز'],forest:['#22c55e','#a3e635','جنگل'],gold:['#f59e0b','#ef4444','طلا'],violet:['#a855f7','#ec4899','بنفش'],cyber:['#00f5d4','#9b5de5','سایبر'],mono:['#94a3b8','#e2e8f0','مونو']};
-const OPT={theme:['حالت تم',[['dark','تیره'],['light','روشن'],['auto','خودکار']]],
- palette:['پالت رنگی کل صفحه',[['default','پیش‌فرض (طبق حالت تم)'],['amoled','آمولد سیاه'],['nord','نورد'],['dracula','دراکولا'],['abyss','اعماق دریا'],['wine','شراب'],['forest','جنگل شب'],['paper','کاغذ (روشن)'],['sand','شنی (روشن)'],['mint','نعنایی (روشن)']]],
- bg:['پس‌زمینه',[['gradient','گرادیانت'],['mesh','مش'],['aurora','شفق متحرک'],['grid','شبکه'],['photo','عکس'],['plain','ساده']]],
- fx:['افکت ذرات متحرک',[['none','بدون'],['stars','ستاره‌ها'],['snow','برف'],['matrix','ماتریکس'],['fireflies','کرم شب‌تاب'],['bubbles','حباب']]],
- noise:['بافت دانه‌دار',[['0','خاموش'],['1','روشن']]],
- cardstyle:['سبک کارت',[['glass','شیشه‌ای'],['solid','تخت'],['outline','خط‌دار'],['neon','نئون']]],
- border:['حاشیه کارت',[['normal','معمولی'],['gradient','گرادیانت'],['animated','گرادیانت متحرک']]],
- hover:['حالت هاور',[['lift','بالا آمدن'],['glow','درخشش'],['none','بدون']]],
- spot:['نور دنبال‌کننده‌ی انگشت/ماوس',[['1','روشن'],['0','خاموش']]],
- btn:['سبک دکمه‌ها',[['gradient','گرادیانت'],['solid','تک‌رنگ'],['pill','قرصی'],['outline','خط‌دار']]],
- titlefx:['افکت عنوان',[['gradient','گرادیانت'],['animated','گرادیانت متحرک'],['plain','ساده']]],
- shape:['شکل آواتار',[['circle','دایره'],['squircle','گرد'],['square','مربع']]],
- pbar:['نوار مصرف',[['gradient','گرادیانت'],['status','رنگ وضعیت'],['striped','راه‌راه']]],
- layout:['چیدمان کاربران',[['list','لیستی'],['grid','شبکه‌ای']]],
- density:['تراکم',[['compact','فشرده'],['normal','معمولی'],['roomy','باز']]],
- enter:['انیمیشن ورود کارت‌ها',[['fade','محو شدن'],['slide','لغزش'],['pop','پاپ'],['none','بدون']]],
- anim:['انیمیشن‌ها',[['1','روشن'],['0','خاموش']]],
- font:['فونت',[['system','سیستم'],['vazir','وزیرمتن'],['tahoma','Tahoma'],['mono','Mono']]]};
-const RNG={fsize:['اندازه متن',12,19],radius:['گردی گوشه‌ها',2,32],blur:['شدت بلور',0,40],opacity:['شفافیت کارت‌ها',0,100],glow:['شدت درخشش',0,100]};
-const GRP=[['🎨 رنگ و تم',['palette','theme','glow'],1],['🖼️ پس‌زمینه و افکت',['bg','fx','noise','blur']],['🃏 کارت‌ها',['cardstyle','border','hover','spot','radius','opacity']],['🔘 دکمه، عنوان و آواتار',['btn','titlefx','shape','pbar']],['📐 چیدمان و حرکت',['layout','density','enter','anim']],['🔤 متن',['font','fsize']]];
+const PRE={midnight:['#7c5cff','#38d4ff','Midnight'],ocean:['#0ea5e9','#22d3ee','Ocean'],aurora:['#10b981','#6366f1','Aurora'],sunset:['#f97316','#ec4899','Sunset'],rose:['#f43f5e','#fb923c','Rose'],forest:['#22c55e','#a3e635','Forest'],gold:['#f59e0b','#ef4444','Gold'],violet:['#a855f7','#ec4899','Violet'],cyber:['#00f5d4','#9b5de5','Cyber'],mono:['#94a3b8','#e2e8f0','Mono']};
+const OPT={theme:['Theme mode',[['dark','Dark'],['light','Light'],['auto','Auto']]],
+ palette:['Page color palette',[['default','Default (follows theme mode)'],['amoled','AMOLED black'],['nord','Nord'],['dracula','Dracula'],['abyss','Deep sea'],['wine','Wine'],['forest','Night forest'],['paper','Paper (light)'],['sand','Sand (light)'],['mint','Mint (light)']]],
+ bg:['Background',[['gradient','Gradient'],['mesh','Mesh'],['aurora','Animated aurora'],['grid','Grid'],['photo','Photo'],['plain','Plain']]],
+ fx:['Animated particle effect',[['none','None'],['stars','Stars'],['snow','Snow'],['matrix','Matrix'],['fireflies','Fireflies'],['bubbles','Bubbles']]],
+ noise:['Film grain',[['0','Off'],['1','On']]],
+ cardstyle:['Card style',[['glass','Glass'],['solid','Flat'],['outline','Outlined'],['neon','Neon']]],
+ border:['Card border',[['normal','Normal'],['gradient','Gradient'],['animated','Animated gradient']]],
+ hover:['Hover effect',[['lift','Lift'],['glow','Glow'],['none','None']]],
+ spot:['Light that follows the finger or mouse',[['1','On'],['0','Off']]],
+ btn:['Button style',[['gradient','Gradient'],['solid','Solid'],['pill','Pill'],['outline','Outlined']]],
+ titlefx:['Title effect',[['gradient','Gradient'],['animated','Animated gradient'],['plain','Plain']]],
+ shape:['Avatar shape',[['circle','Circle'],['squircle','Rounded'],['square','Square']]],
+ pbar:['Usage bar',[['gradient','Gradient'],['status','Status color'],['striped','Striped']]],
+ layout:['User layout',[['list','List'],['grid','Grid']]],
+ density:['Density',[['compact','Compact'],['normal','Normal'],['roomy','Roomy']]],
+ enter:['Card entrance animation',[['fade','Fade'],['slide','Slide'],['pop','Pop'],['none','None']]],
+ anim:['Animations',[['1','On'],['0','Off']]],
+ font:['Font',[['system','System'],['vazir','Vazirmatn'],['tahoma','Tahoma'],['mono','Mono']]]};
+const RNG={fsize:['Text size',12,19],radius:['Corner roundness',2,32],blur:['Blur strength',0,40],opacity:['Card transparency',0,100],glow:['Glow intensity',0,100]};
+const GRP=[['🎨 Color and theme',['palette','theme','glow'],1],['🖼️ Background and effects',['bg','fx','noise','blur']],['🃏 Cards',['cardstyle','border','hover','spot','radius','opacity']],['🔘 Buttons, title and avatar',['btn','titlefx','shape','pbar']],['📐 Layout and motion',['layout','density','enter','anim']],['🔤 Text',['font','fsize']]];
 const DEF={accent:'#7c5cff',accent2:'#38d4ff',theme:'dark',palette:'default',radius:'16',bg:'gradient',fx:'none',noise:'0',cardstyle:'glass',border:'normal',hover:'lift',spot:'1',btn:'gradient',titlefx:'gradient',shape:'squircle',pbar:'gradient',layout:'list',density:'normal',enter:'fade',anim:'1',font:'system',fsize:'15',blur:'14',opacity:'40',glow:'40',bgimg:'',prefix:''};
-const LOOKS={cyber:['⚡ سایبرپانک',{palette:'amoled',accent:'#00f5d4',accent2:'#9b5de5',fx:'matrix',bg:'plain',cardstyle:'neon',border:'animated',font:'mono',titlefx:'animated',glow:'70'}],
- aurora:['🌌 شفق شمالی',{palette:'abyss',accent:'#10b981',accent2:'#6366f1',bg:'aurora',border:'gradient',titlefx:'animated',glow:'50'}],
- space:['🚀 فضایی',{palette:'amoled',accent:'#a855f7',accent2:'#38d4ff',fx:'stars',border:'gradient',glow:'60'}],
- sunset:['🌇 غروب',{palette:'wine',accent:'#f97316',accent2:'#ec4899',bg:'mesh',fx:'fireflies',border:'gradient',glow:'55'}],
- snow:['❄️ زمستان',{palette:'abyss',accent:'#0ea5e9',accent2:'#e0f2fe',fx:'snow',glow:'35'}],
- royal:['👑 سلطنتی',{palette:'amoled',accent:'#f59e0b',accent2:'#ef4444',bg:'plain',cardstyle:'outline',border:'gradient',titlefx:'animated',glow:'60'}],
- matrix:['🟢 ماتریکس',{palette:'amoled',accent:'#22c55e',accent2:'#a3e635',fx:'matrix',bg:'plain',cardstyle:'outline',font:'mono',glow:'65'}],
- clean:['🤍 مینیمال',{palette:'paper',accent:'#4f46e5',accent2:'#06b6d4',bg:'plain',cardstyle:'solid',titlefx:'plain',hover:'lift',glow:'0',spot:'0'}],
- candy:['🍬 آبنباتی',{palette:'mint',accent:'#ec4899',accent2:'#8b5cf6',bg:'mesh',fx:'bubbles',border:'gradient',glow:'40'}]};
+const LOOKS={cyber:['⚡ Cyberpunk',{palette:'amoled',accent:'#00f5d4',accent2:'#9b5de5',fx:'matrix',bg:'plain',cardstyle:'neon',border:'animated',font:'mono',titlefx:'animated',glow:'70'}],
+ aurora:['🌌 Northern lights',{palette:'abyss',accent:'#10b981',accent2:'#6366f1',bg:'aurora',border:'gradient',titlefx:'animated',glow:'50'}],
+ space:['🚀 Space',{palette:'amoled',accent:'#a855f7',accent2:'#38d4ff',fx:'stars',border:'gradient',glow:'60'}],
+ sunset:['🌇 Sunset',{palette:'wine',accent:'#f97316',accent2:'#ec4899',bg:'mesh',fx:'fireflies',border:'gradient',glow:'55'}],
+ snow:['❄️ Winter',{palette:'abyss',accent:'#0ea5e9',accent2:'#e0f2fe',fx:'snow',glow:'35'}],
+ royal:['👑 Royal',{palette:'amoled',accent:'#f59e0b',accent2:'#ef4444',bg:'plain',cardstyle:'outline',border:'gradient',titlefx:'animated',glow:'60'}],
+ matrix:['🟢 Matrix',{palette:'amoled',accent:'#22c55e',accent2:'#a3e635',fx:'matrix',bg:'plain',cardstyle:'outline',font:'mono',glow:'65'}],
+ clean:['🤍 Minimal',{palette:'paper',accent:'#4f46e5',accent2:'#06b6d4',bg:'plain',cardstyle:'solid',titlefx:'plain',hover:'lift',glow:'0',spot:'0'}],
+ candy:['🍬 Candy',{palette:'mint',accent:'#ec4899',accent2:'#8b5cf6',bg:'mesh',fx:'bubbles',border:'gradient',glow:'40'}]};
 const LB={palette:'default',theme:'dark',bg:'gradient',fx:'none',noise:'0',cardstyle:'glass',border:'normal',hover:'lift',spot:'1',btn:'gradient',titlefx:'gradient',font:'system',glow:'40',enter:'fade'};
 const g=k=>S[k]??DEF[k];
 function fld(k){const o=OPT[k],r=RNG[k];return o?`<label>${o[0]}</label><select id="s_${k}">${o[1].map(([a,b])=>`<option value="${a}">${b}</option>`).join('')}</select>`:`<label>${r[0]}: <b id="v_${k}">${g(k)}</b></label><input id="s_${k}" type="range" min="${r[1]}" max="${r[2]}" value="${g(k)}">`}
 function openSet(){
  const col=(k,n)=>`<div><label>${n}</label><input id="s_${k}" type="color" value="${g(k)}" style="height:44px;padding:4px"></div>`;
- $('sb').innerHTML=`<div class="mh"><div class="mi">🎨</div><div><h3>استودیوی ظاهر</h3><small>تغییرها زنده دیده می‌شن</small></div><button class="x" onclick="closeSet()">✕</button></div>
- <label>✨ ظاهرهای آماده (یک‌ضربه)</label><div class="lks">${Object.entries(LOOKS).map(([k,[n,o]])=>`<div class="lk2" style="background:linear-gradient(135deg,${o.accent||'#7c5cff'},${o.accent2||'#38d4ff'})" onclick="look('${k}')">${n}</div>`).join('')}</div>
- <label>رنگ‌های آماده</label><div class="sw">${Object.entries(PRE).map(([k,[a,b,n]])=>`<span title="${n}" style="background:linear-gradient(135deg,${a},${b})" onclick="pre('${k}')"></span>`).join('')}</div>
- <div class="row">${col('accent','رنگ اصلی')}${col('accent2','رنگ دوم')}</div>
- ${GRP.map(([t,ks,op])=>`<details class="gp" ${op?'open':''}><summary>${t}</summary>${ks.map(k=>fld(k)).join('')}${t.includes('پس‌زمینه')?`<label>آدرس https عکس پس‌زمینه (برای حالت «عکس»)</label><input id="s_bgimg" dir="ltr" value="${esc(S.bgimg||'')}" placeholder="https://...">`:''}</details>`).join('')}
- <details class="gp"><summary>🏷️ نام و قفل‌ها</summary><label>پیشوند نام کانفیگ</label><input id="s_prefix" maxlength="20" value="${esc(S.prefix||'')}">
- <div class="lk" style="direction:rtl;text-align:right;margin-top:10px">🔒 عنوان پنل: ${esc(S.title)}<br>🔒 دامنه‌ی کانفیگ‌ها: ${esc(ME.domain||'')}<br><small>تنظیمات حساس فقط توسط مالک سرور قابل تغییره</small></div></details>
- <div class="act"><button class="btn" onclick="cp(JSON.stringify(ap()))">📤 کپی ظاهر</button><button class="btn" onclick="imp()">📥 اعمال از متن</button></div>
- <div class="act stk"><button class="btn p" onclick="saveSet()">💾 ذخیره</button><button class="btn" onclick="resetSet()">پیش‌فرض ظاهر</button><button class="btn" onclick="closeSet()">بستن</button></div>`;
+ $('sb').innerHTML=`<div class="mh"><div class="mi">🎨</div><div><h3>Appearance studio</h3><small>Changes are previewed live</small></div><button class="x" onclick="closeSet()">✕</button></div>
+ <label>✨ Presets (one tap)</label><div class="lks">${Object.entries(LOOKS).map(([k,[n,o]])=>`<div class="lk2" style="background:linear-gradient(135deg,${o.accent||'#7c5cff'},${o.accent2||'#38d4ff'})" onclick="look('${k}')">${n}</div>`).join('')}</div>
+ <label>Preset colors</label><div class="sw">${Object.entries(PRE).map(([k,[a,b,n]])=>`<span title="${n}" style="background:linear-gradient(135deg,${a},${b})" onclick="pre('${k}')"></span>`).join('')}</div>
+ <div class="row">${col('accent','Main color')}${col('accent2','Second color')}</div>
+ ${GRP.map(([t,ks,op])=>`<details class="gp" ${op?'open':''}><summary>${t}</summary>${ks.map(k=>fld(k)).join('')}${t.includes('Background')?`<label>Background image https URL (for Photo mode)</label><input id="s_bgimg" dir="ltr" value="${esc(S.bgimg||'')}" placeholder="https://...">`:''}</details>`).join('')}
+ <details class="gp"><summary>🏷️ Name and locks</summary><label>Config name prefix</label><input id="s_prefix" maxlength="20" value="${esc(S.prefix||'')}">
+ <div class="lk" style="direction:ltr;text-align:left;margin-top:10px">🔒 Panel title: ${esc(S.title)}<br><small>Sensitive settings can only be changed by the server owner</small></div></details>
+ <div class="act"><button class="btn" onclick="cp(JSON.stringify(ap()))">📤 Copy look</button><button class="btn" onclick="imp()">📥 Apply from text</button></div>
+ <div class="act stk"><button class="btn p" onclick="saveSet()">💾 Save</button><button class="btn" onclick="resetSet()">Reset look</button><button class="btn" onclick="closeSet()">Close</button></div>`;
  for(const k in OPT)$('s_'+k).value=g(k);
  $('sb').oninput=prev;$('ms').classList.add('on')}
 function val(){const T={...S};document.querySelectorAll('#sb [id^=s_]').forEach(e=>T[e.id.slice(2)]=e.value);for(const k in RNG){const e=$('v_'+k);if(e)e.textContent=T[k]}return T}
@@ -379,22 +376,13 @@ const prev=(()=>{let t;return()=>{cancelAnimationFrame(t);t=requestAnimationFram
 const ap=()=>{const o={};document.querySelectorAll('#sb [id^=s_]').forEach(e=>{const k=e.id.slice(2);if(!['domain','address','fp','prefix','title','cands','r_host','r_port','r_dest'].includes(k))o[k]=e.value});return o};
 function pre(k){$('s_accent').value=PRE[k][0];$('s_accent2').value=PRE[k][1];prev()}
 function look(k){const L={...LB,...LOOKS[k][1]};for(const x in L){const e=$('s_'+x);if(e)e.value=L[x]}prev();toast(LOOKS[k][0])}
-function imp(){const t=prompt('متن ظاهر رو اینجا بچسبون');if(!t)return;try{const o=JSON.parse(t);for(const k in o){const e=$('s_'+k);if(e)e.value=o[k]}prev();toast('✅ اعمال شد')}catch(e){toast('⚠️ متن معتبر نیست')}}
+function imp(){const t=prompt('Paste the look text here');if(!t)return;try{const o=JSON.parse(t);for(const k in o){const e=$('s_'+k);if(e)e.value=o[k]}prev();toast('✅ Applied')}catch(e){toast('⚠️ Invalid text')}}
 function closeSet(){cl('ms');applyTheme()}
 async function saveSet(){const b={};document.querySelectorAll('#sb [id^=s_]').forEach(e=>b[e.id.slice(2)]=e.value);
- Object.assign(S,b);applyTheme();cl('ms');render();toast('✅ تنظیمات ذخیره شد');
+ Object.assign(S,b);applyTheme();cl('ms');render();toast('✅ Settings saved');
  const r=await api('PUT','/api/settings',b);if(r.detail)toast('⚠️ '+r.detail)}
-async function resetSet(){if(await ask('ظاهر به پیش‌فرض برگردد؟','بازنشانی')){Object.assign(S,DEF);applyTheme();cl('ms');render();toast('✅ برگشت به پیش‌فرض');api('PUT','/api/settings',DEF)}}
+async function resetSet(){if(await ask('Reset the look to default?','Reset')){Object.assign(S,DEF);applyTheme();cl('ms');render();toast('✅ Reset to default');api('PUT','/api/settings',DEF)}}
 
-async function openAcc(){$('mab').innerHTML=`<div class="mh"><div class="mi">👑</div><div><h3>مدیریت حساب‌ها</h3><small>تأیید، سقف‌ها و دامنه‌ی هر حساب</small></div><button class="x" onclick="cl('mac')">✕</button></div><div id="accl">⏳</div>`;$('mac').classList.add('on');loadAcc()}
-async function loadAcc(){const d=await api('GET','/api/accounts');if(d.detail)return toast('⚠️ '+d.detail);
- $('accl').innerHTML=d.accounts.map(a=>`<div class="sec"><div class="rw"><b dir="ltr">${esc(a.email)}</b><span class="tag ${a.status==='active'?'ok':a.status==='pending'?'off':'no'}">${{active:'فعال',pending:'در انتظار تأیید',blocked:'مسدود'}[a.status]||a.status}</span></div>
- <small style="color:var(--m)">${a.role==='owner'?'👑 مالک · ':''}${a.users} کاربر · ${fb(a.traffic)} مصرف</small>
- ${a.role==='owner'?'':`<div class="row" style="margin-top:8px"><div><label>سقف کاربر (0=نامحدود)</label><input id="am_${a.id}" type="number" min="0" value="${a.max_users}"></div><div><label>سقف حجم GB (0=نامحدود)</label><input id="ag_${a.id}" type="number" min="0" value="${a.max_gb}"></div></div>
- <label>دامنه‌ی اختصاصی (فقط مالک؛ خالی = دامنه‌ی سرور)</label><input id="ad_${a.id}" dir="ltr" value="${esc(a.domain||'')}">
- <div class="act"><button class="btn p" onclick="saveAcc(${a.id},'active')">✅ ذخیره و فعال</button><button class="btn" onclick="saveAcc(${a.id},'blocked')">⛔ مسدود</button><button class="btn d" onclick="delAcc(${a.id})">🗑</button></div>`}</div>`).join('')||'—'}
-async function saveAcc(id,st){const r=await api('PUT','/api/accounts/'+id,{status:st,max_users:+$('am_'+id).value||0,max_gb:+$('ag_'+id).value||0,domain:$('ad_'+id).value.trim()});if(r.detail)return toast('⚠️ '+r.detail);toast('✅ ذخیره شد');loadAcc()}
-async function delAcc(id){if(await ask('این حساب و همه‌ی کاربرهاش حذف بشه؟','حذف')){const r=await api('DELETE','/api/accounts/'+id);if(r.detail)return toast('⚠️ '+r.detail);loadAcc()}}
 load();setInterval(()=>{if(!document.hidden)load()},20000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});setTimeout(loadQR,4000);
 </script>
 </body>
