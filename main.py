@@ -1,21 +1,52 @@
-# ============================ KING_PANNEL ============================
-import os, json, time, uuid, secrets, base64, sqlite3, subprocess, threading, hashlib, hmac, re, socket, urllib.parse
+# ============================ KING PANEL ============================
+# Deployment bot:  repo -> Cloudflare -> address -> "new password (x2)" -> panel
+#
+# What this file does, in order:
+#   1. On boot it connects to Cloudflare and creates/updates the DNS record
+#      pointing at this deployment, so the panel already has a real address.
+#   2. The first visitor sees the setup page: the panel ADDRESS is shown and the
+#      new password is asked TWICE (with a match check). Afterwards the browser
+#      walks straight into the panel (/admin).
+#   3. The panel can also be opened from anywhere else (a static copy) by typing
+#      the server address + password on its "connect" screen.
+#   4. Every proxy protocol is terminated HERE and bridged to the local Xray
+#      inbounds over WebSocket, which is what makes the generated configs
+#      actually connect (before, Xray only listened on 127.0.0.1 with nobody
+#      forwarding to it).
+import os, json, time, uuid, secrets, base64, sqlite3, subprocess, threading, hashlib, hmac, re, socket
+import urllib.parse, urllib.request, urllib.error
 from typing import Optional
-from fastapi import FastAPI, Depends, HTTPException, Response, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Depends, HTTPException, Response, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 from pydantic import BaseModel
 
 
 def env(k, d=""):
     return (os.environ.get(k) or d).strip()
 
+
+def host_of(u):
+    """https://a.b/c  ->  a.b"""
+    u = (u or "").strip()
+    if not u:
+        return ""
+    if "//" not in u:
+        u = "//" + u
+    try:
+        return (urllib.parse.urlsplit(u).netloc or "").split("@")[-1].split(":")[0].lower()
+    except Exception:
+        return ""
+
+
 # optional override; by default the host of the incoming request is used for every config link
 DOMAIN_ENV = re.sub(r"^https?://", "", env("DOMAIN")).split("/")[0]
-TITLE = env("PANEL_TITLE", "KING_PANNEL")          # locked: cannot be changed from inside the panel
+TITLE = env("PANEL_TITLE", "KING PANEL")          # locked: cannot be changed from inside the panel
 DATA = env("DATA_DIR", "/data")
-WS_PATH = "/in2"
 GB = 1024 ** 3
 ADMIN_USER = env("ADMIN_USER", "admin").lower()    # owner username (password: variable ADMIN_PASSWORD)
+PUBLIC_URL = env("PUBLIC_URL").rstrip("/")         # optional: forces the advertised panel address
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 # appearance settings each account may change (sensitive settings such as domain and title are locked)
 APPEARANCE = {"accent": "#7c5cff", "accent2": "#38d4ff", "theme": "dark", "palette": "default", "radius": "16",
@@ -40,13 +71,14 @@ db.execute("""CREATE TABLE IF NOT EXISTS users(
  limit_bytes INTEGER DEFAULT 0, expire INTEGER DEFAULT 0, up INTEGER DEFAULT 0, down INTEGER DEFAULT 0,
  enabled INTEGER DEFAULT 1, note TEXT DEFAULT '', created INTEGER DEFAULT 0, protos TEXT DEFAULT 'vmess',
  port INTEGER DEFAULT 443, fp TEXT DEFAULT '', addr TEXT DEFAULT '', ttl_days INTEGER DEFAULT 0, owner_id INTEGER DEFAULT 1)""")
-db.execute("CREATE TABLE IF NOT EXISTS account_settings(account_id INTEGER, k TEXT, v TEXT, PRIMARY KEY(account_id, k))")
-db.execute("CREATE TABLE IF NOT EXISTS account_kv(account_id INTEGER, k TEXT, v TEXT, PRIMARY KEY(account_id, k))")
+db.execute("""CREATE TABLE IF NOT EXISTS account_settings(account_id INTEGER, k TEXT, v TEXT, PRIMARY KEY(account_id, k))""")
+db.execute("""CREATE TABLE IF NOT EXISTS account_kv(account_id INTEGER, k TEXT, v TEXT, PRIMARY KEY(account_id, k))""")
+db.execute("""CREATE TABLE IF NOT EXISTS sys(k TEXT PRIMARY KEY, v TEXT)""")
 for col in ("note TEXT DEFAULT ''", "created INTEGER DEFAULT 0", "protos TEXT DEFAULT 'vmess'", "port INTEGER DEFAULT 443",
             "fp TEXT DEFAULT ''", "addr TEXT DEFAULT ''", "ttl_days INTEGER DEFAULT 0", "owner_id INTEGER DEFAULT 1"):
     try: db.execute("ALTER TABLE users ADD COLUMN " + col)
     except Exception: pass
-try:  # migration from the previous version: old appearance settings ← owner
+try:  # migration from the previous version: old appearance settings <- owner
     if not db.execute("SELECT 1 FROM account_settings LIMIT 1").fetchone():
         for r in db.execute("SELECT k, v FROM settings").fetchall():
             if r["k"] in APPEARANCE:
@@ -58,7 +90,8 @@ for r in db.execute("SELECT id, protos FROM users WHERE protos LIKE '%reality%'"
                (",".join(x for x in r["protos"].split(",") if x != "reality") or "vmess", r["id"]))
 db.commit()
 
-def get_kv(aid, k, default=None):
+
+def kv(aid, k, default=None):
     with L:
         r = db.execute("SELECT v FROM account_kv WHERE account_id=? AND k=?", (aid, k)).fetchone()
     try:
@@ -66,15 +99,33 @@ def get_kv(aid, k, default=None):
     except Exception:
         return default
 
+
 def set_kv(aid, k, val):
     with L:
         db.execute("INSERT OR REPLACE INTO account_kv VALUES(?,?,?)", (aid, k, json.dumps(val, ensure_ascii=False)))
         db.commit()
 
+
+def sys_get(k, default=None):
+    with L:
+        r = db.execute("SELECT v FROM sys WHERE k=?", (k,)).fetchone()
+    try:
+        return json.loads(r["v"]) if r else default
+    except Exception:
+        return default
+
+
+def sys_set(k, val):
+    with L:
+        db.execute("INSERT OR REPLACE INTO sys VALUES(?,?)", (k, json.dumps(val, ensure_ascii=False)))
+        db.commit()
+
+
 # ------------------------- passwords and sessions -------------------------
 def hash_pw(pw, salt=None):
     salt = salt or secrets.token_bytes(16)
     return salt.hex() + "$" + hashlib.pbkdf2_hmac("sha256", pw.encode(), salt, 200_000).hex()
+
 
 def check_pw(pw, stored):
     try:
@@ -83,14 +134,17 @@ def check_pw(pw, stored):
     except Exception:
         return False
 
+
 DUMMY_HASH = hash_pw("dummy-password")
 
 SETUP_KEY = env("SETUP_KEY")   # optional: the first-run setup page then requires ?key=<SETUP_KEY>
 SETUP_USER_RE = re.compile(r"^[A-Za-z0-9._-]{3,32}$")
 
+
 def needs_setup():
     with L:
         return db.execute("SELECT 1 FROM accounts WHERE role='owner'").fetchone() is None
+
 
 def bootstrap_owner():
     """With ADMIN_PASSWORD set the owner is managed by variables; without it the first visitor creates the owner on the setup page."""
@@ -106,21 +160,37 @@ def bootstrap_owner():
                        (ADMIN_USER, hash_pw(pw), int(time.time())))
         db.commit()
 
+
 SESS = {}   # token -> (account_id, expiry)
 fails = {}  # key (ip/email) -> (count, start)
 regs = {}
 
+
 def new_session(aid):
     t = secrets.token_urlsafe(32)
-    SESS[t] = (aid, time.time() + 12 * 3600)
+    SESS[t] = (aid, time.time() + 30 * 24 * 3600)
     return t
+
 
 def drop_sessions(aid):
     for t in [t for t, v in SESS.items() if v[0] == aid]:
         SESS.pop(t, None)
 
+
+def token_of(request: Request):
+    """A session can arrive either as the cookie (same-origin panel) or as a
+    bearer token (panel opened from another host, e.g. a static copy)."""
+    t = (request.cookies.get("sess") or "").strip()
+    if t:
+        return t
+    h = (request.headers.get("authorization") or "").strip()
+    if h.lower().startswith("bearer "):
+        return h[7:].strip()
+    return ""
+
+
 def me_of(request: Request):
-    t = request.cookies.get("sess") or ""
+    t = token_of(request)
     s = SESS.get(t)
     if not s or s[1] < time.time():
         SESS.pop(t, None)
@@ -132,21 +202,30 @@ def me_of(request: Request):
         return None
     return a
 
+
 def auth(request: Request):
     a = me_of(request)
     if not a:
         raise HTTPException(401)
-    if request.method not in ("GET", "HEAD") and request.headers.get("x-requested-with") != "panel":
-        raise HTTPException(403)   # guard CSRF
+    if request.method not in ("GET", "HEAD"):
+        # a bearer token is not auto-attached by the browser, so it already
+        # protects against CSRF; the cookie path keeps the header guard.
+        if (request.headers.get("authorization") or "").lower().startswith("bearer "):
+            return a
+        if request.headers.get("x-requested-with") != "panel":
+            raise HTTPException(403)
     return a
+
 
 def owner_only(a=Depends(auth)):
     if a["role"] != "owner":
         raise HTTPException(403)
     return a
 
+
 def client_ip(request: Request):
     return (request.headers.get("x-real-ip") or request.headers.get("x-forwarded-for") or request.client.host).split(",")[0].strip()
+
 
 def throttle(key, limit, window=600):
     now = time.time()
@@ -157,21 +236,26 @@ def throttle(key, limit, window=600):
         raise HTTPException(429, "Too many attempts; try again in a few minutes")
     return n, t
 
+
 def is_active(u):
     now = time.time()
     return (u["enabled"] and (u["limit_bytes"] == 0 or u["up"] + u["down"] < u["limit_bytes"])
             and (u["expire"] == 0 or u["expire"] > now))
 
+
 def active_users():
     return [u for u in db.execute("SELECT users.* FROM users JOIN accounts ON accounts.id=users.owner_id WHERE accounts.status='active'")
             if is_active(u)]
 
+
 # ------------------------- Xray management -------------------------
-PATHS = {"vmess": WS_PATH, "vless": "/vl", "trojan": "/tr", "vlessh": "/hu"}
+# Every inbound listens on loopback in PLAIN websocket mode. TLS is terminated
+# by the platform/CDN edge and this app forwards the websocket stream to Xray.
+PATHS = {"vmess": "/in2", "vless": "/vl", "trojan": "/tr", "vlessh": "/hu"}
 LABEL = {"vmess": "VMess", "vless": "VLESS", "trojan": "Trojan", "vlessh": "VLESS-HU"}
 # protocol: (tag, internal port, xray protocol, transport type)
 INB = {"vmess": ("vmess-in", 10000, "vmess", "ws"), "vless": ("vless-in", 10001, "vless", "ws"),
-       "trojan": ("trojan-in", 10002, "trojan", "ws"), "vlessh": ("vlessh-in", 10003, "vless", "httpupgrade")}
+       "trojan": ("trojan-in", 10002, "trojan", "ws"), "vlessh": ("vlessh-in", 10003, "vless", "ws")}
 CONF = os.path.join(DATA, "xray.json")
 API = "127.0.0.1:10085"
 proc = None
@@ -179,6 +263,7 @@ current = None
 bad_ids = None
 last_err = ""
 pending = False
+
 
 def clients_for(p, users):
     out = []
@@ -194,6 +279,7 @@ def clients_for(p, users):
         out = [{"password": d, "email": "dummy"} if p == "trojan" else {"id": d, "email": "dummy"}]
     return out
 
+
 def write_config(users, path=None):
     inbounds = [{"tag": "api", "listen": "127.0.0.1", "port": 10085, "protocol": "dokodemo-door",
                  "settings": {"address": "127.0.0.1"}}]
@@ -201,8 +287,7 @@ def write_config(users, path=None):
         st = {"clients": clients_for(p, users)}
         if proto == "vless":
             st["decryption"] = "none"
-        ss = ({"network": "ws", "wsSettings": {"path": PATHS[p]}} if net == "ws"
-              else {"network": "httpupgrade", "httpupgradeSettings": {"path": PATHS[p]}})
+        ss = {"network": net, "security": "none", "wsSettings": {"path": PATHS[p]}}
         inbounds.append({"tag": tag, "listen": "127.0.0.1", "port": port, "protocol": proto, "settings": st, "streamSettings": ss})
     cfg = {
         "log": {"loglevel": "warning"},
@@ -220,12 +305,14 @@ def write_config(users, path=None):
         json.dump(cfg, f)
     return [i["port"] for i in inbounds]
 
+
 def port_open(port, host="127.0.0.1"):
     try:
         socket.create_connection((host, port), 0.6).close()
         return True
     except OSError:
         return False
+
 
 def xray_test(path):
     try:
@@ -237,6 +324,7 @@ def xray_test(path):
     except Exception:
         return True, ""
 
+
 def wait_ready(ports, timeout=9):
     end = time.time() + timeout
     while time.time() < end:
@@ -247,8 +335,10 @@ def wait_ready(ports, timeout=9):
         time.sleep(0.3)
     return False
 
+
 def pairs(users):
     return frozenset((u["id"], p) for u in users for p in u["protos"].split(",") if p in INB)
+
 
 def sync():
     global proc, current, bad_ids, last_err
@@ -275,7 +365,14 @@ def sync():
             except Exception: proc.kill()
         os.replace(new_conf, CONF)
         for attempt in (1, 2):
-            proc = subprocess.Popen(["xray", "run", "-c", CONF])
+            try:
+                proc = subprocess.Popen(["xray", "run", "-c", CONF])
+            except FileNotFoundError:
+                # remember this set so the loop does not retry it every 10s
+                bad_ids = ids
+                last_err = "The xray binary is not installed in this container; configs cannot be served."
+                print("[xray] binary missing", flush=True)
+                return
             if wait_ready(ports):
                 break
             print(f"[xray] not ready (attempt {attempt}, exit={proc.poll()})", flush=True)
@@ -285,18 +382,21 @@ def sync():
                 except Exception: proc.kill()
         closed = [p for p in ports if not port_open(p)]
         ready = proc.poll() is None and not closed
-        last_err = "" if ready else f"Xray did not start; ports not open: {closed or '—'}; check the Railway logs"
+        last_err = "" if ready else f"Xray did not start; ports not open: {closed or '—'}; check the logs"
         bad_ids = None
         current = ids
         print("[xray] started ready=%s users per protocol: %s" % (ready, {p: sum(1 for i, q in ids if q == p) for p in INB}), flush=True)
 
+
 _ev = threading.Event()
+
 
 def sync_async():
     """The API answers immediately; applying to Xray happens in the background (consecutive changes are batched)"""
     global pending
     pending = True
     _ev.set()
+
 
 def _syncer():
     global pending
@@ -310,6 +410,7 @@ def _syncer():
             print("[sync] error:", e, flush=True)
         if not _ev.is_set():
             pending = False
+
 
 def collect():
     try:
@@ -328,6 +429,7 @@ def collect():
         db.execute("UPDATE users SET expire=?+ttl_days*86400, ttl_days=0 WHERE ttl_days>0 AND expire=0 AND up+down>0", (int(time.time()),))
         db.commit()
 
+
 def loop():
     time.sleep(3)
     while True:
@@ -342,11 +444,15 @@ def loop():
             print("loop error:", e, flush=True)
         time.sleep(10)
 
+
 # ------------------------- links -------------------------
 ALLOWED_PORTS = {443, 8443, 2053, 2083, 2087, 2096}
 FPS = {"", "android", "chrome", "firefox", "safari", "ios", "random"}
 
+
 def links(u, dom, prefix):
+    """Every link is TLS + websocket on the CDN port; this app terminates the
+    websocket and hands it to Xray, which is why these connect."""
     fp = u["fp"] or "chrome"
     port = u["port"] if u["port"] in ALLOWED_PORTS else 443
     name = prefix + u["name"]
@@ -360,7 +466,7 @@ def links(u, dom, prefix):
                    "sni": dom, "alpn": "http/1.1", "fp": fp}
             out.append((p, "vmess://" + base64.b64encode(json.dumps(cfg, ensure_ascii=False).encode()).decode()))
             continue
-        q = {"security": "tls", "type": "httpupgrade" if p == "vlessh" else "ws", "host": dom, "path": PATHS[p]}
+        q = {"security": "tls", "type": "ws", "host": dom, "path": PATHS[p]}
         if p != "trojan":
             q["encryption"] = "none"
         q.update(sni=dom, fp=fp, alpn="http/1.1")
@@ -369,8 +475,10 @@ def links(u, dom, prefix):
         out.append((p, f"{scheme}://{u['uuid']}@{dom}:{port}?{urllib.parse.urlencode(q)}#{tag}"))
     return out
 
+
 # clean-IP / multi-location variants: only the connect address changes, SNI and Host stay on the real domain
 LINK_RE = re.compile(r"^([a-z]+://[^@]+@)(\[[^\]]+\]|[^:/?#]+)(:\d+)?([^#]*)(#.*)?$", re.I)
+
 
 def with_ip(link, addr, port=""):
     try:
@@ -396,11 +504,13 @@ def with_ip(link, addr, port=""):
     except Exception:
         return link
 
+
 def full(u, dom, prefix):
     d = {k: u[k] for k in u.keys() if k not in ("owner_id", "addr")}
     d["active"] = bool(is_active(u))
     d["links"] = [{"p": p, "l": l} for p, l in links(u, dom, prefix)]
     return d
+
 
 def settings_for(aid):
     d = dict(APPEARANCE)
@@ -409,19 +519,42 @@ def settings_for(aid):
     d["title"] = TITLE   # locked
     return d
 
+
 HOST_RE = re.compile(r"^[A-Za-z0-9.\-]{1,253}$")
+
 
 def req_host(request):
     """Config links always point at the host the panel or subscription was opened with."""
     h = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip().split(":")[0].lower()
-    return DOMAIN_ENV or (h if HOST_RE.match(h) else "localhost")
+    if DOMAIN_ENV:
+        return DOMAIN_ENV
+    if PUBLIC_URL:
+        return host_of(PUBLIC_URL) or h
+    return h if HOST_RE.match(h) else "localhost"
+
+
+def public_addr(request=None):
+    """The address the panel advertises (used on the setup screen)."""
+    if PUBLIC_URL:
+        return PUBLIC_URL
+    if DOMAIN_ENV:
+        return "https://" + DOMAIN_ENV
+    rec = sys_get("cf") or {}
+    if rec.get("fqdn"):
+        return "https://" + rec["fqdn"]
+    if request is not None:
+        return str(request.base_url).rstrip("/")
+    return "http://localhost:8080"
+
 
 def clean_protos(l):
     l = [p for p in (l or []) if p in PATHS]
     return ",".join(dict.fromkeys(l)) or "vmess"
 
+
 def used_bytes(aid, exclude=None):
     return db.execute("SELECT COALESCE(SUM(limit_bytes),0) s FROM users WHERE owner_id=? AND id IS NOT ?", (aid, exclude)).fetchone()["s"]
+
 
 def meminfo():
     mem = {}
@@ -434,26 +567,37 @@ def meminfo():
     total = mem.get("MemTotal", 0)
     return total - mem.get("MemAvailable", total), total
 
+
 def my_stats(a):
     with L:
         us = db.execute("SELECT * FROM users WHERE owner_id=?", (a["id"],)).fetchall()
     d = {"users": len(us), "active": sum(1 for u in us if is_active(u)), "traffic": sum(u["up"] + u["down"] for u in us),
-         "applying": pending, "ram_used": 0, "ram_total": 0, "load": 0, "xray_err": ""}
+         "applying": pending, "ram_used": 0, "ram_total": 0, "load": 0, "xray_err": "", "tls": True}
     if a["role"] == "owner":
         d["ram_used"], d["ram_total"] = meminfo()
-        d["load"] = os.getloadavg()[0]
+        try: d["load"] = os.getloadavg()[0]
+        except Exception: d["load"] = 0.0
         d["xray_err"] = last_err
     return d
 
-def me_info(a):
-    return {"email": a["email"], "role": a["role"], "max_users": a["max_users"], "max_gb": a["max_gb"]}
+
+def me_info(a, request=None):
+    return {"email": a["email"], "role": a["role"], "max_users": a["max_users"], "max_gb": a["max_gb"],
+            "is_admin": a["role"] == "owner", "addr": public_addr(request)}
+
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
+# The panel may be opened from another origin (a static copy): allow it, and
+# authorise with a bearer token rather than a cross-site cookie.
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
+                   allow_methods=["*"], allow_headers=["*"], expose_headers=["*"], max_age=86400)
+
 # connect-src allows https: so the panel's Scanner page can time-test clean IPs straight from the browser
-CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; "
        "img-src 'self' data: https:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+
 
 @app.middleware("http")
 async def secure_headers(request: Request, call_next):
@@ -471,17 +615,211 @@ async def secure_headers(request: Request, call_next):
         h["Content-Security-Policy"] = CSP
     return resp
 
+
 @app.on_event("startup")
 def start():
     threading.Thread(target=_syncer, daemon=True).start()
     threading.Thread(target=loop, daemon=True).start()
+    threading.Thread(target=cf_startup, daemon=True).start()
     sync_async()
 
-# ------------------------- login and sign-up -------------------------
 
+# ============================ CLOUDFLARE ============================
+# repo -> Cloudflare: on boot the DNS record for this deployment is created or
+# updated, so the panel already has a real, TLS-terminated address to show on
+# the setup screen. Entirely optional: without CF_API_TOKEN it stays off.
+CF_BASE = "https://api.cloudflare.com/client/v4"
+
+
+def cf_api(method, path, body=None):
+    tok = env("CF_API_TOKEN")
+    req = urllib.request.Request(CF_BASE + path, method=method,
+                                 data=json.dumps(body).encode() if body is not None else None,
+                                 headers={"Authorization": "Bearer " + tok, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read().decode() or "{}")
+    except urllib.error.HTTPError as e:
+        try:
+            return json.loads(e.read().decode() or "{}")
+        except Exception:
+            return {"success": False, "errors": [{"message": "HTTP %s" % e.code}]}
+    except Exception as e:
+        return {"success": False, "errors": [{"message": str(e)}]}
+
+
+def cf_sync():
+    """Create or update the DNS record; never raises (a failure must not stop the bot)."""
+    out = {"state": "off", "msg": "CF_API_TOKEN not set", "fqdn": "", "proxied": False}
+    tok = env("CF_API_TOKEN")
+    if not tok:
+        sys_set("cf", out)
+        return out
+    try:
+        zone_id = env("CF_ZONE_ID")
+        zone_name = env("CF_ZONE_NAME")
+        if not zone_id:
+            if not zone_name:
+                out.update(state="error", msg="Set CF_ZONE_ID or CF_ZONE_NAME")
+                sys_set("cf", out)
+                return out
+            z = cf_api("GET", "/zones?name=" + urllib.parse.quote(zone_name))
+            res = (z.get("result") or [])
+            if not z.get("success") or not res:
+                msg = ((z.get("errors") or [{}])[0].get("message") or "zone not found")
+                out.update(state="error", msg="Zone lookup failed: " + msg)
+                sys_set("cf", out)
+                return out
+            zone_id = res[0]["id"]
+
+        if not zone_name:
+            z = cf_api("GET", "/zones?per_page=1&id=" + urllib.parse.quote(zone_id))
+            res = (z.get("result") or [])
+            zone_name = res[0]["name"] if res else ""
+
+        rec = env("CF_RECORD") or "@"
+        fqdn = (zone_name if rec in ("@", "") else (rec if rec.endswith(zone_name) else rec + "." + zone_name)).lower()
+        target = (env("CF_TARGET") or host_of(PUBLIC_URL) or env("RAILWAY_PUBLIC_DOMAIN")
+                  or env("RENDER_EXTERNAL_HOSTNAME") or env("FLY_APP_NAME") or "")
+        if not target:
+            out.update(state="error", msg="No target host: set CF_TARGET (or PUBLIC_URL / RAILWAY_PUBLIC_DOMAIN)")
+            sys_set("cf", out)
+            return out
+        target = host_of(target) or target
+        is_ip = bool(re.fullmatch(r"(?:\d{1,3}\.){3}\d{1,3}", target))
+        rtype = "A" if is_ip else "CNAME"
+        proxied = env("CF_PROXIED", "1") not in ("0", "false", "no")
+
+        found = cf_api("GET", f"/zones/{zone_id}/dns_records?name=" + urllib.parse.quote(fqdn))
+        body = {"type": rtype, "name": fqdn, "content": target, "ttl": 1, "proxied": proxied}
+        existing = (found.get("result") or [])
+        if existing:
+            rid = existing[0]["id"]
+            r = cf_api("PATCH", f"/zones/{zone_id}/dns_records/{rid}", body)
+        else:
+            r = cf_api("POST", f"/zones/{zone_id}/dns_records", body)
+
+        if r.get("success"):
+            out = {"state": "ok", "msg": f"{rtype} {fqdn} → {target}" + (" (proxied)" if proxied else ""),
+                   "fqdn": fqdn, "proxied": proxied, "target": target, "updated": int(time.time())}
+        else:
+            msg = ((r.get("errors") or [{}])[0].get("message") or "unknown error")
+            out = {"state": "error", "msg": "Cloudflare rejected the record: " + msg, "fqdn": fqdn, "proxied": proxied}
+    except Exception as e:
+        out = {"state": "error", "msg": "Cloudflare sync failed: " + str(e), "fqdn": "", "proxied": False}
+    sys_set("cf", out)
+    print("[cf]", out.get("state"), out.get("msg"), flush=True)
+    return out
+
+
+def cf_startup():
+    time.sleep(1.5)
+    cf_sync()
+
+
+# ============================ WEBSOCKET BRIDGE ============================
+# This is the piece that was missing: Xray listens on loopback only, so the
+# configs had nothing to talk to. Here the incoming websocket (already TLS
+# terminated by the edge) is piped to the matching Xray inbound.
+import asyncio
+
+_WS_PORTS = {"in2": 10000, "vl": 10001, "tr": 10002, "hu": 10003}
+
+
+async def ws_bridge(ws: WebSocket, port, path):
+    try:
+        import websockets
+    except ImportError:
+        print("[ws] the 'websockets' package is missing; run: pip install websockets", flush=True)
+        await ws.close(code=1011)
+        return
+    await ws.accept()
+    up = None
+    try:
+        up = await websockets.connect(f"ws://127.0.0.1:{port}{path}", max_size=None, open_timeout=8,
+                                      ping_interval=20, ping_timeout=20)
+    except Exception as e:
+        print(f"[ws] cannot reach xray on {port}{path}: {e}", flush=True)
+        try: await ws.close(code=1011)
+        except Exception: pass
+        return
+
+    async def c2s():
+        while True:
+            m = await ws.receive()
+            if m["type"] == "websocket.disconnect":
+                return
+            if m.get("bytes") is not None:
+                await up.send(m["bytes"])
+            elif m.get("text") is not None:
+                await up.send(m["text"])
+
+    async def s2c():
+        async for m in up:
+            if isinstance(m, bytes):
+                await ws.send_bytes(m)
+            else:
+                await ws.send_text(m)
+
+    t1 = asyncio.create_task(c2s())
+    t2 = asyncio.create_task(s2c())
+    try:
+        done, pend = await asyncio.wait({t1, t2}, return_when=asyncio.FIRST_COMPLETED)
+        for t in pend:
+            t.cancel()
+    except Exception:
+        pass
+    finally:
+        for t in (t1, t2):
+            if not t.done():
+                t.cancel()
+        try: await up.close()
+        except Exception: pass
+        try: await ws.close()
+        except Exception: pass
+
+
+@app.websocket("/in2")
+async def ws_vmess(ws: WebSocket):
+    await ws_bridge(ws, _WS_PORTS["in2"], "/in2")
+
+
+@app.websocket("/vl")
+async def ws_vless(ws: WebSocket):
+    await ws_bridge(ws, _WS_PORTS["vl"], "/vl")
+
+
+@app.websocket("/tr")
+async def ws_trojan(ws: WebSocket):
+    await ws_bridge(ws, _WS_PORTS["tr"], "/tr")
+
+
+@app.websocket("/hu")
+async def ws_vlessh(ws: WebSocket):
+    await ws_bridge(ws, _WS_PORTS["hu"], "/hu")
+
+
+# ------------------------- login and sign-up -------------------------
 def need_header(request: Request):
     if request.headers.get("x-requested-with") != "panel":
         raise HTTPException(403)
+
+
+def session_response(aid, ok_body=None):
+    t = new_session(aid)
+    r = Response(json.dumps({"ok": True, "token": t, **(ok_body or {})}), media_type="application/json")
+    r.set_cookie("sess", t, max_age=30 * 24 * 3600, httponly=True, samesite="lax", secure=True, path="/")
+    return r
+
+
+@app.get("/api/ping")
+def api_ping(request: Request):
+    """Public, secret-free handshake used by the panel's connect screen to check
+    that an address really is a King Panel before asking for a password."""
+    cf = sys_get("cf") or {}
+    return {"ok": True, "app": "king-panel", "title": TITLE, "setup": needs_setup(),
+            "addr": public_addr(request), "cf": cf.get("state", "off")}
+
 
 @app.post("/login")
 def login(body: dict, request: Request):
@@ -505,16 +843,16 @@ def login(body: dict, request: Request):
         raise HTTPException(403, "Account is blocked")
     fails.pop("ip:" + ip, None)
     fails.pop("em:" + ident, None)
-    r = Response('{"ok":true}', media_type="application/json")
-    r.set_cookie("sess", new_session(a["id"]), max_age=12 * 3600, httponly=True, samesite="strict", secure=True, path="/")
-    return r
+    return session_response(a["id"], {"me": me_info(a, request)})
+
 
 @app.get("/logout")
 def logout(request: Request):
-    SESS.pop(request.cookies.get("sess") or "", None)
+    SESS.pop(token_of(request), None)
     r = RedirectResponse("/login")
     r.delete_cookie("sess", path="/")
     return r
+
 
 @app.put("/api/password")
 def change_password(body: dict, request: Request, a=Depends(auth)):
@@ -538,9 +876,8 @@ def change_password(body: dict, request: Request, a=Depends(auth)):
         db.commit()
     fails.pop(key, None)
     drop_sessions(a["id"])
-    r = Response('{"ok":true}', media_type="application/json")
-    r.set_cookie("sess", new_session(a["id"]), max_age=12 * 3600, httponly=True, samesite="strict", secure=True, path="/")
-    return r
+    return session_response(a["id"])
+
 
 # ------------------------- API users -------------------------
 class NewUser(BaseModel):
@@ -556,6 +893,7 @@ class NewUser(BaseModel):
     uuid: str = ""
     enabled: bool = True
 
+
 class EditUser(BaseModel):
     name: Optional[str] = None
     note: Optional[str] = None
@@ -569,13 +907,15 @@ class EditUser(BaseModel):
     fp: Optional[str] = None
     reset: bool = False
 
+
 @app.get("/api/all")
 def api_all(request: Request, a=Depends(auth)):
     st, dom = settings_for(a["id"]), req_host(request)
     with L:
         us = db.execute("SELECT * FROM users WHERE owner_id=? ORDER BY id DESC", (a["id"],)).fetchall()
         users = [full(u, dom, st["prefix"]) for u in us]
-    return {"me": me_info(a), "users": users, "settings": st, "stats": my_stats(a)}
+    return {"me": me_info(a, request), "users": users, "settings": st, "stats": my_stats(a)}
+
 
 @app.post("/api/users")
 def add_user(n: NewUser, request: Request, a=Depends(auth)):
@@ -613,6 +953,7 @@ def add_user(n: NewUser, request: Request, a=Depends(auth)):
     sync_async()
     return {"ok": True, "users": created, "stats": my_stats(a)}
 
+
 @app.put("/api/users/{uid}")
 def edit_user(uid: int, e: EditUser, request: Request, a=Depends(auth)):
     with L:
@@ -649,6 +990,7 @@ def edit_user(uid: int, e: EditUser, request: Request, a=Depends(auth)):
     sync_async()
     return {"ok": True, "user": user, "stats": my_stats(a)}
 
+
 @app.delete("/api/users/{uid}")
 def del_user(uid: int, a=Depends(auth)):
     with L:
@@ -656,6 +998,7 @@ def del_user(uid: int, a=Depends(auth)):
         db.commit()
     sync_async()
     return {"ok": True, "stats": my_stats(a)}
+
 
 @app.put("/api/settings")
 def put_settings(body: dict, a=Depends(auth)):
@@ -673,15 +1016,19 @@ def put_settings(body: dict, a=Depends(auth)):
         db.commit()
     return {"ok": True}
 
+
 # ------------------------- clean-IP pool and multi-location (used by /sub) -------------------------
 IP_RE = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$")
+
 
 def _port_ok(p):
     return p == "" or (p.isdigit() and 1 <= int(p) <= 65535)
 
+
 @app.get("/api/pool")
 def get_pool(a=Depends(auth)):
-    return get_kv(a["id"], "pool", {"ips": [], "locs": [], "n": 10, "sub": 0})
+    return kv(a["id"], "pool", {"ips": [], "locs": [], "n": 10, "sub": 0})
+
 
 @app.put("/api/pool")
 def put_pool(body: dict, a=Depends(auth)):
@@ -704,9 +1051,11 @@ def put_pool(body: dict, a=Depends(auth)):
     set_kv(a["id"], "pool", {"ips": ips, "locs": locs, "n": n, "sub": 1 if body.get("sub") else 0})
     return {"ok": True}
 
+
 @app.get("/healthz")
 def healthz():
-    return Response("ok", media_type="text/plain")
+    return PlainTextResponse("ok")
+
 
 @app.get("/sub/{token}")
 def sub(token: str, request: Request):
@@ -717,7 +1066,7 @@ def sub(token: str, request: Request):
         raise HTTPException(404)
     lk = links(u, req_host(request), settings_for(acc["id"])["prefix"])
     out = [l for _, l in lk]
-    cfg = get_kv(acc["id"], "pool")
+    cfg = kv(acc["id"], "pool")
     if cfg and cfg.get("sub"):   # clean IPs and locations are appended after the normal links
         ips = cfg.get("ips", [])[:max(1, int(cfg.get("n", 10)))]
         for _, l in lk:
@@ -731,27 +1080,38 @@ def sub(token: str, request: Request):
          "profile-title": "base64:" + base64.b64encode(TITLE.encode()).decode()}
     return Response(base64.b64encode("\n".join(out).encode()), media_type="text/plain", headers=h)
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+
 _admin_html = None
+
 
 def panel_page(request: Request):
     global _admin_html
     if not me_of(request):
         return RedirectResponse("/login")
     if _admin_html is None:
-        _admin_html = open(os.path.join(HERE, "admin.html"), encoding="utf-8").read()
+        for name in ("admin.html", "index.html"):
+            fp = os.path.join(HERE, name)
+            if os.path.exists(fp):
+                _admin_html = open(fp, encoding="utf-8").read()
+                break
+        if _admin_html is None:
+            _admin_html = FALLBACK_HTML
     return HTMLResponse(_admin_html)
+
 
 @app.get("/")
 def root(request: Request):
     return panel_page(request)
 
+
 @app.get("/admin")
 def admin(request: Request):
     return panel_page(request)
 
+
 @app.post("/setup")
 def setup(body: dict, request: Request):
+    """First run: the address is already on screen, the password is asked twice."""
     need_header(request)
     ip = client_ip(request)
     n, t = throttle("setup:" + ip, 20)
@@ -759,8 +1119,11 @@ def setup(body: dict, request: Request):
     if SETUP_KEY and not hmac.compare_digest(str(body.get("key", "")).encode(), SETUP_KEY.encode()):
         time.sleep(1.0)
         raise HTTPException(403, "Invalid setup key")
-    user = str(body.get("username", "")).strip().lower()
     pw = str(body.get("password", ""))
+    pw2 = str(body.get("password2", body.get("confirm", pw)))
+    if pw != pw2:
+        raise HTTPException(400, "The two passwords do not match")
+    user = (str(body.get("username", "")).strip().lower() or ADMIN_USER or "admin")
     if not SETUP_USER_RE.match(user):
         raise HTTPException(400, "Username must be 3 to 32 characters: letters, digits, dot, dash or underscore")
     if not 8 <= len(pw) <= 128:
@@ -773,9 +1136,18 @@ def setup(body: dict, request: Request):
         db.execute("INSERT INTO accounts(id,email,pw_hash,role,status,max_users,max_gb,created) VALUES(1,?,?,'owner','active',0,0,?)",
                    (user, hash_pw(pw), int(time.time())))
         db.commit()
-    r = Response('{"ok":true}', media_type="application/json")
-    r.set_cookie("sess", new_session(1), max_age=12 * 3600, httponly=True, samesite="strict", secure=True, path="/")
-    return r
+    fails.pop("setup:" + ip, None)
+    return session_response(1, {"addr": public_addr(request)})
+
+
+@app.get("/api/cf")
+def api_cf(request: Request):
+    """Cloudflare status; re-runs the sync when asked (owner only when signed in)."""
+    a = me_of(request)
+    if request.query_params.get("sync") and a and a["role"] == "owner":
+        return cf_sync()
+    return sys_get("cf") or {"state": "off", "msg": "CF_API_TOKEN not set"}
+
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
@@ -783,51 +1155,171 @@ def login_page(request: Request):
         key = request.query_params.get("key", "")
         if SETUP_KEY and not hmac.compare_digest(key.encode(), SETUP_KEY.encode()):
             raise HTTPException(404)
-        return SETUP.replace("__TITLE__", TITLE)
-    return LOGIN.replace("__TITLE__", TITLE)
+        cf = sys_get("cf") or {"state": "off", "msg": ""}
+        addr = public_addr(request)
+        cfnote = {"ok": "Connected to Cloudflare · " + (cf.get("msg") or ""),
+                  "error": "Cloudflare: " + (cf.get("msg") or "error"),
+                  "off": "Cloudflare is not connected (optional)"}.get(cf.get("state", "off"), "")
+        return HTMLResponse(SETUP.replace("__TITLE__", TITLE).replace("__ADDR__", addr)
+                            .replace("__ADDRJS__", json.dumps(addr)).replace("__CFNOTE__", cfnote)
+                            .replace("__CFSTATE__", cf.get("state", "off")))
+    return HTMLResponse(LOGIN.replace("__TITLE__", TITLE))
+
 
 @app.get("/setup", response_class=HTMLResponse)
 def setup_page(request: Request):
     return login_page(request)
 
-SETUP = """<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>__TITLE__</title>
-<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,Tahoma,sans-serif;
-background:radial-gradient(900px 500px at 80% -10%,#4b34c4 0,transparent 60%),radial-gradient(700px 500px at 0 110%,#0f6e8c 0,transparent 55%),#0a0c13;color:#eef0f8}
-.b{width:min(380px,92vw);padding:28px;border-radius:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(18px);animation:fu .6s both}
-@keyframes fu{from{opacity:0;transform:translateY(18px)}}
-h2{margin:0 0 4px}p{margin:0 0 18px;color:#9aa3bd;font-size:14px;line-height:1.6}
-input{width:100%;padding:13px 14px;margin:6px 0;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.3);color:#fff;font-size:15px}
-button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;background:linear-gradient(135deg,#7c5cff,#38d4ff);color:#fff;font-size:16px;font-weight:700}
-button:hover{filter:brightness(1.12)}#e{color:#ff6b7a;font-size:13px;min-height:18px;margin-top:8px}</style></head><body>
-<form class="b" onsubmit="go(event)"><h2>🔐 __TITLE__</h2><p>Welcome! Choose a new username and password for your panel. Keep them safe: this is the only time they are set here.</p>
-<input id="u" placeholder="New username" autocomplete="username" autocapitalize="none"><input id="p" type="password" placeholder="New password (8+ characters)" autocomplete="new-password"><input id="c" type="password" placeholder="Repeat password" autocomplete="new-password">
-<label style="font-size:13px;color:#9aa3bd;display:block;margin-top:4px"><input type="checkbox" style="width:auto;margin:6px" onchange="p.type=c.type=this.checked?'text':'password'">Show password</label>
-<button>Create account and continue</button><div id="e"></div></form>
-<script>async function go(ev){ev.preventDefault();e.textContent='';
-if(p.value!==c.value){e.textContent='Passwords do not match';return}
-let r,j={};try{r=await fetch('/setup',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'panel'},
-body:JSON.stringify({username:u.value,password:p.value,key:new URLSearchParams(location.search).get('key')||''})});
-try{j=await r.json()}catch(x){}}catch(x){e.textContent='Network error';return}
-if(r.ok)location='/admin';else e.textContent=j.detail||'Error ('+r.status+')'}</script></body></html>"""
 
-LOGIN = """<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8">
+FALLBACK_HTML = """<!doctype html><meta charset="utf-8"><title>KING PANEL</title>
+<body style="font:16px system-ui;background:#0b0d13;color:#e8ebf2;display:grid;place-items:center;height:100vh;margin:0">
+<div style="text-align:center;max-width:460px;padding:28px">
+<h2 style="margin:0 0 10px">admin.html is missing</h2>
+<p style="color:#8b93a7;line-height:1.7">Put the panel file next to <code>main.py</code>, named
+<code>admin.html</code> (or <code>index.html</code>), then restart the bot.</p></div></body>"""
+
+SETUP = """<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>__TITLE__</title>
-<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,Tahoma,sans-serif;
-background:radial-gradient(900px 500px at 80% -10%,#4b34c4 0,transparent 60%),radial-gradient(700px 500px at 0 110%,#0f6e8c 0,transparent 55%),#0a0c13;color:#eef0f8}
-.b{width:min(360px,92vw);padding:28px;border-radius:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(18px);animation:fu .6s both}
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;
+ font-family:Vazirmatn,system-ui,Tahoma,sans-serif;color:#eef0f8;
+ background:radial-gradient(900px 520px at 82% -12%,#4b34c4 0,transparent 62%),
+            radial-gradient(760px 520px at -6% 112%,#0f6e8c 0,transparent 58%),#08090d}
+.shell{width:min(880px,96vw);display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:780px){.shell{grid-template-columns:1fr}}
+.card{padding:26px;border-radius:22px;background:rgba(255,255,255,.055);
+ border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(20px);
+ box-shadow:0 30px 80px -40px rgba(0,0,0,.9);animation:fu .55s both}
+@keyframes fu{from{opacity:0;transform:translateY(16px)}}
+.eye{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;letter-spacing:.14em;
+ text-transform:uppercase;color:#9aa3bd;border:1px solid rgba(255,255,255,.13);
+ padding:5px 11px;border-radius:99px}
+.dot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.16)}
+.dot.err{background:#f87171;box-shadow:0 0 0 4px rgba(248,113,113,.16)}
+.dot.off{background:#8b93a7;box-shadow:0 0 0 4px rgba(139,147,167,.14)}
+h1{margin:16px 0 6px;font-size:25px;letter-spacing:-.4px;
+ background:linear-gradient(120deg,#fff,#b9c1ff 55%,#7ee7ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+p{margin:0 0 16px;color:#9aa3bd;font-size:13.5px;line-height:1.75}
+.addr{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.34);
+ border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 12px;direction:ltr}
+.addr code{flex:1;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;
+ color:#a9f3ff;overflow:auto;white-space:nowrap;scrollbar-width:none}
+.addr code::-webkit-scrollbar{display:none}
+.cp{border:0;border-radius:10px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;
+ background:rgba(255,255,255,.1);color:#e8ebf2;transition:.15s}
+.cp:hover{background:rgba(255,255,255,.18)}
+.note{margin-top:12px;font-size:12px;line-height:1.6;padding:9px 11px;border-radius:11px;
+ background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#9aa3bd}
+ol{margin:14px 0 0;padding-inline-start:18px;color:#9aa3bd;font-size:12.5px;line-height:2}
+.lbl{display:block;font-size:12px;color:#8b93a7;margin:12px 0 6px;font-weight:600}
+input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.14);
+ background:rgba(0,0,0,.3);color:#fff;font-size:15px;font-family:inherit;outline:none;transition:.16s}
+input:focus{border-color:#7c5cff;box-shadow:0 0 0 3px rgba(124,92,255,.2)}
+button.go{width:100%;margin-top:16px;padding:13px;border:0;border-radius:12px;cursor:pointer;
+ background:linear-gradient(135deg,#7c5cff,#38d4ff);color:#fff;font-size:15.5px;font-weight:800;
+ font-family:inherit;transition:.18s}
+button.go:hover{filter:brightness(1.12);transform:translateY(-1px)}
+button.go:disabled{opacity:.6;cursor:wait;transform:none}
+#e{color:#ff8b98;font-size:12.5px;min-height:17px;margin-top:9px;line-height:1.6}
+.meter{height:4px;border-radius:99px;background:rgba(255,255,255,.1);margin-top:9px;overflow:hidden}
+.meter i{display:block;height:100%;width:0;border-radius:99px;transition:.25s;
+ background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e)}
+.show{display:flex;align-items:center;gap:7px;font-size:12px;color:#9aa3bd;margin-top:10px}
+.show input{width:auto;margin:0}
+</style></head><body>
+<div class="shell">
+  <div class="card">
+    <span class="eye"><span class="dot __CFSTATE__"></span> King Panel · __CFNOTE__</span>
+    <h1>پنل شما آماده است</h1>
+    <p>این آدرسِ پنل شماست. آن را کپی کنید و همین حالا رمز جدید را تعیین کنید —
+    بلافاصله بعد از تعیین رمز وارد پنل می‌شوید.</p>
+    <div class="addr"><code id="addr">__ADDR__</code><button class="cp" onclick="copyAddr()">کپی</button></div>
+    <div class="note" id="cpnote">آدرس پنل را در جای امن نگه دارید؛ همین آدرس، آدرس اتصال کانفیگ‌ها هم هست.</div>
+    <ol>
+      <li>رمز جدید را دو بار وارد کنید</li>
+      <li>دکمهٔ «ساخت پنل و ورود» را بزنید</li>
+      <li>مستقیم داخل پنل ادمین می‌روید</li>
+    </ol>
+  </div>
+  <div class="card">
+    <h1 style="font-size:20px;margin:0 0 4px">تعیین رمز مدیر</h1>
+    <p style="margin-bottom:4px">فقط رمز را انتخاب کنید. نام کاربری پیش‌فرض <code style="color:#a9f3ff">admin</code> است و می‌توانید همین‌جا عوضش کنید.</p>
+    <form onsubmit="return go(event)" autocomplete="on">
+      <label class="lbl" for="u">نام کاربری (اختیاری)</label>
+      <input id="u" placeholder="admin" autocomplete="username" autocapitalize="none" spellcheck="false">
+      <label class="lbl" for="p">رمز جدید</label>
+      <input id="p" type="password" placeholder="حداقل ۸ کاراکتر" autocomplete="new-password">
+      <div class="meter"><i id="mb"></i></div>
+      <label class="lbl" for="c">تکرار رمز</label>
+      <input id="c" type="password" placeholder="همان رمز را دوباره وارد کنید" autocomplete="new-password">
+      <label class="show"><input type="checkbox" onchange="p.type=c.type=this.checked?'text':'password'"> نمایش رمز</label>
+      <button class="go" id="btn">ساخت پنل و ورود</button>
+      <div id="e"></div>
+    </form>
+  </div>
+</div>
+<script>
+var ADDR=__ADDRJS__;
+function copyAddr(){var t=ADDR;
+ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,ok2)}else{ok2()}
+ function ok(){$('cpnote').textContent='✅ آدرس کپی شد.'}
+ function ok2(){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();
+  try{document.execCommand('copy')}catch(x){}a.remove();$('cpnote').textContent='✅ آدرس کپی شد.'}}
+function $(i){return document.getElementById(i)}
+function strength(v){var s=0;if(v.length>=8)s++;if(v.length>=12)s++;if(/[A-Z]/.test(v)&&/[a-z]/.test(v))s++;if(/[0-9]/.test(v))s++;if(/[^A-Za-z0-9]/.test(v))s++;return s}
+$('p').addEventListener('input',function(){var s=strength(this.value);$('mb').style.width=(s/5*100)+'%'});
+async function go(ev){ev.preventDefault();var E=$('e');E.textContent='';
+ var pw=$('p').value,cw=$('c').value;
+ if(pw!==cw){E.textContent='⛔ دو رمز یکسان نیستند.';return false}
+ if(pw.length<8){E.textContent='⛔ رمز باید حداقل ۸ کاراکتر باشد.';return false}
+ var b=$('btn');b.disabled=true;b.textContent='در حال ساخت...';
+ var r,j={};
+ try{
+  r=await fetch('/setup',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'panel'},
+   body:JSON.stringify({username:$('u').value,password:pw,password2:cw,
+    key:new URLSearchParams(location.search).get('key')||''})});
+  try{j=await r.json()}catch(x){}
+ }catch(x){b.disabled=false;b.textContent='ساخت پنل و ورود';E.textContent='⛔ خطای شبکه؛ دوباره تلاش کنید.';return false}
+ if(r.ok){b.textContent='ورود به پنل...';location='/admin'}
+ else{b.disabled=false;b.textContent='ساخت پنل و ورود';E.textContent='⛔ '+(j.detail||('خطا ('+r.status+')'))}
+ return false}
+</script></body></html>"""
+
+LOGIN = """<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>__TITLE__</title>
+<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;
+font-family:Vazirmatn,system-ui,Tahoma,sans-serif;
+background:radial-gradient(900px 500px at 80% -10%,#4b34c4 0,transparent 60%),
+radial-gradient(700px 500px at 0 110%,#0f6e8c 0,transparent 55%),#0a0c13;color:#eef0f8}
+.b{width:min(366px,92vw);padding:28px;border-radius:22px;background:rgba(255,255,255,.06);
+border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(18px);animation:fu .6s both}
 @keyframes fu{from{opacity:0;transform:translateY(18px)}}
 h2{margin:0 0 4px}p{margin:0 0 18px;color:#9aa3bd;font-size:14px}
-input{width:100%;padding:13px 14px;margin:6px 0;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.3);color:#fff;font-size:15px}
-button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;background:linear-gradient(135deg,#7c5cff,#38d4ff);color:#fff;font-size:16px;font-weight:700}
-button:hover{filter:brightness(1.12)}#e{color:#ff6b7a;font-size:13px;min-height:18px;margin-top:8px}</style></head><body>
-<form class="b" onsubmit="go(event)"><h2>🔐 __TITLE__</h2><p>Sign in to continue</p>
-<input id="u" placeholder="Username" autocomplete="username" autocapitalize="none"><input id="p" type="password" placeholder="Password" autocomplete="current-password">
-<label style="font-size:13px;color:#9aa3bd;display:block;margin-top:4px"><input type="checkbox" style="width:auto;margin:6px" onchange="p.type=this.checked?'text':'password'">Show password</label>
-<button>Sign in</button><div id="e"></div></form>
-<script>async function go(ev){ev.preventDefault();e.textContent='';let r,j={};
-try{r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'panel'},body:JSON.stringify({username:u.value,password:p.value})});
-try{j=await r.json()}catch(x){}}catch(x){e.textContent='Network error';return}
-if(r.ok)location='/admin';else e.textContent=j.detail||'Error ('+r.status+')'}</script></body></html>"""
+input{width:100%;padding:13px 14px;margin:6px 0;border-radius:12px;border:1px solid rgba(255,255,255,.14);
+background:rgba(0,0,0,.3);color:#fff;font-size:15px;font-family:inherit;outline:none}
+input:focus{border-color:#7c5cff;box-shadow:0 0 0 3px rgba(124,92,255,.2)}
+button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;
+background:linear-gradient(135deg,#7c5cff,#38d4ff);color:#fff;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer}
+button:hover{filter:brightness(1.12)}
+#e{color:#ff6b7a;font-size:13px;min-height:18px;margin-top:8px}</style></head><body>
+<form class="b" onsubmit="return go(event)"><h2>🔐 __TITLE__</h2><p>برای ادامه وارد شوید</p>
+<input id="u" placeholder="نام کاربری" autocomplete="username" autocapitalize="none">
+<input id="p" type="password" placeholder="رمز عبور" autocomplete="current-password">
+<label style="font-size:13px;color:#9aa3bd;display:block;margin-top:4px">
+<input type="checkbox" style="width:auto;margin:6px" onchange="p.type=this.checked?'text':'password'"> نمایش رمز</label>
+<button>ورود</button><div id="e"></div></form>
+<script>async function go(ev){ev.preventDefault();var E=document.getElementById('e');E.textContent='';
+ var r,j={};
+ try{r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'panel'},
+  body:JSON.stringify({username:document.getElementById('u').value,password:document.getElementById('p').value})});
+  try{j=await r.json()}catch(x){}
+ }catch(x){E.textContent='خطای شبکه';return false}
+ if(r.ok)location='/admin';else E.textContent=j.detail||('خطا ('+r.status+')');
+ return false}</script></body></html>"""
 
 bootstrap_owner()
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(env("PORT", "8080") or 8080), log_level="info")
