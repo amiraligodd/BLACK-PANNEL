@@ -22,9 +22,9 @@ APPEARANCE = {"accent": "#7c5cff", "accent2": "#38d4ff", "theme": "dark", "palet
               "bg": "gradient", "fx": "none", "noise": "0", "cardstyle": "glass", "border": "normal", "hover": "lift",
               "spot": "1", "btn": "gradient", "titlefx": "gradient", "shape": "squircle", "pbar": "gradient",
               "layout": "list", "density": "normal", "enter": "fade", "anim": "1", "font": "system", "fsize": "15",
-              "blur": "14", "opacity": "40", "glow": "40", "bgimg": "", "prefix": ""}
+              "blur": "14", "opacity": "40", "glow": "40", "swidth": "20", "bgimg": "", "prefix": ""}
 HEX_KEYS = ("accent", "accent2")
-NUM_KEYS = ("radius", "fsize", "blur", "opacity", "glow")
+NUM_KEYS = ("radius", "fsize", "blur", "opacity", "glow", "swidth")
 
 os.makedirs(DATA, exist_ok=True)
 L = threading.RLock()
@@ -41,6 +41,7 @@ db.execute("""CREATE TABLE IF NOT EXISTS users(
  enabled INTEGER DEFAULT 1, note TEXT DEFAULT '', created INTEGER DEFAULT 0, protos TEXT DEFAULT 'vmess',
  port INTEGER DEFAULT 443, fp TEXT DEFAULT '', addr TEXT DEFAULT '', ttl_days INTEGER DEFAULT 0, owner_id INTEGER DEFAULT 1)""")
 db.execute("CREATE TABLE IF NOT EXISTS account_settings(account_id INTEGER, k TEXT, v TEXT, PRIMARY KEY(account_id, k))")
+db.execute("CREATE TABLE IF NOT EXISTS account_kv(account_id INTEGER, k TEXT, v TEXT, PRIMARY KEY(account_id, k))")
 for col in ("note TEXT DEFAULT ''", "created INTEGER DEFAULT 0", "protos TEXT DEFAULT 'vmess'", "port INTEGER DEFAULT 443",
             "fp TEXT DEFAULT ''", "addr TEXT DEFAULT ''", "ttl_days INTEGER DEFAULT 0", "owner_id INTEGER DEFAULT 1"):
     try: db.execute("ALTER TABLE users ADD COLUMN " + col)
@@ -56,6 +57,19 @@ for r in db.execute("SELECT id, protos FROM users WHERE protos LIKE '%reality%'"
     db.execute("UPDATE users SET protos=? WHERE id=?",
                (",".join(x for x in r["protos"].split(",") if x != "reality") or "vmess", r["id"]))
 db.commit()
+
+def get_kv(aid, k, default=None):
+    with L:
+        r = db.execute("SELECT v FROM account_kv WHERE account_id=? AND k=?", (aid, k)).fetchone()
+    try:
+        return json.loads(r["v"]) if r else default
+    except Exception:
+        return default
+
+def set_kv(aid, k, val):
+    with L:
+        db.execute("INSERT OR REPLACE INTO account_kv VALUES(?,?,?)", (aid, k, json.dumps(val, ensure_ascii=False)))
+        db.commit()
 
 # ------------------------- passwords and sessions -------------------------
 def hash_pw(pw, salt=None):
@@ -355,6 +369,33 @@ def links(u, dom, prefix):
         out.append((p, f"{scheme}://{u['uuid']}@{dom}:{port}?{urllib.parse.urlencode(q)}#{tag}"))
     return out
 
+# clean-IP / multi-location variants: only the connect address changes, SNI and Host stay on the real domain
+LINK_RE = re.compile(r"^([a-z]+://[^@]+@)(\[[^\]]+\]|[^:/?#]+)(:\d+)?([^#]*)(#.*)?$", re.I)
+
+def with_ip(link, addr, port=""):
+    try:
+        if link.startswith("vmess://"):
+            j = json.loads(base64.b64decode(link[8:]))
+            j["host"] = j.get("host") or j["add"]
+            j["sni"] = j.get("sni") or j["host"]
+            j["add"] = addr
+            if port:
+                j["port"] = str(port)
+            j["ps"] = f"{j.get('ps', '')} | {addr}"
+            return "vmess://" + base64.b64encode(json.dumps(j, ensure_ascii=False).encode()).decode()
+        m = LINK_RE.match(link)
+        if not m:
+            return link
+        a, h, pt, q, f = m.groups()
+        qd = dict(urllib.parse.parse_qsl(q.lstrip("?")))
+        qd.setdefault("sni", h)
+        if "host" not in qd and qd.get("type") in ("ws", "httpupgrade", "xhttp", "splithttp"):
+            qd["host"] = h
+        frag = (f + urllib.parse.quote(" | " + addr)) if f else "#" + urllib.parse.quote(addr)
+        return f"{a}{addr}:{port or (pt[1:] if pt else 443)}?{urllib.parse.urlencode(qd)}{frag}"
+    except Exception:
+        return link
+
 def full(u, dom, prefix):
     d = {k: u[k] for k in u.keys() if k not in ("owner_id", "addr")}
     d["active"] = bool(is_active(u))
@@ -409,9 +450,10 @@ def me_info(a):
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
+# connect-src allows https: so the panel's Scanner page can time-test clean IPs straight from the browser
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; "
-       "img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+       "img-src 'self' data: https:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 
 @app.middleware("http")
 async def secure_headers(request: Request, call_next):
@@ -472,6 +514,32 @@ def logout(request: Request):
     SESS.pop(request.cookies.get("sess") or "", None)
     r = RedirectResponse("/login")
     r.delete_cookie("sess", path="/")
+    return r
+
+@app.put("/api/password")
+def change_password(body: dict, request: Request, a=Depends(auth)):
+    """Change the password of the signed-in account (all other sessions are signed out)."""
+    if a["role"] == "owner" and env("ADMIN_PASSWORD"):
+        # bootstrap_owner() would overwrite the new password with the variable on the next restart
+        raise HTTPException(409, "The owner password is managed by the ADMIN_PASSWORD variable; change it there")
+    key = "pw:%s" % a["id"]
+    n, t = throttle(key, 8)
+    old, new = str(body.get("old", ""))[:200], str(body.get("new", ""))
+    if not check_pw(old, a["pw_hash"]):
+        fails[key] = (n + 1, t)
+        time.sleep(1.0)
+        raise HTTPException(403, "Current password is wrong")
+    if not 8 <= len(new) <= 128:
+        raise HTTPException(400, "Password must be 8 to 128 characters")
+    if new.lower() == (a["email"] or "").lower():
+        raise HTTPException(400, "Password must differ from the username")
+    with L:
+        db.execute("UPDATE accounts SET pw_hash=? WHERE id=?", (hash_pw(new), a["id"]))
+        db.commit()
+    fails.pop(key, None)
+    drop_sessions(a["id"])
+    r = Response('{"ok":true}', media_type="application/json")
+    r.set_cookie("sess", new_session(a["id"]), max_age=12 * 3600, httponly=True, samesite="strict", secure=True, path="/")
     return r
 
 # ------------------------- API users -------------------------
@@ -605,7 +673,37 @@ def put_settings(body: dict, a=Depends(auth)):
         db.commit()
     return {"ok": True}
 
-# ------------------------- account management (owner only) -------------------------
+# ------------------------- clean-IP pool and multi-location (used by /sub) -------------------------
+IP_RE = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$")
+
+def _port_ok(p):
+    return p == "" or (p.isdigit() and 1 <= int(p) <= 65535)
+
+@app.get("/api/pool")
+def get_pool(a=Depends(auth)):
+    return get_kv(a["id"], "pool", {"ips": [], "locs": [], "n": 10, "sub": 0})
+
+@app.put("/api/pool")
+def put_pool(body: dict, a=Depends(auth)):
+    ips = []
+    for x in (body.get("ips") or [])[:1000]:
+        x = str(x).strip()
+        if IP_RE.match(x) and _port_ok(x.partition(":")[2]):
+            ips.append(x)
+    locs = []
+    for l in (body.get("locs") or [])[:100]:
+        if not isinstance(l, dict):
+            continue
+        h, p = str(l.get("h", "")).strip(), str(l.get("p", "")).strip()
+        if HOST_RE.match(h) and _port_ok(p):
+            locs.append({"n": str(l.get("n", h)).strip()[:40], "h": h, "p": p})
+    try:
+        n = max(1, min(100, int(body.get("n", 10))))
+    except (TypeError, ValueError):
+        n = 10
+    set_kv(a["id"], "pool", {"ips": ips, "locs": locs, "n": n, "sub": 1 if body.get("sub") else 0})
+    return {"ok": True}
+
 @app.get("/healthz")
 def healthz():
     return Response("ok", media_type="text/plain")
@@ -618,10 +716,20 @@ def sub(token: str, request: Request):
     if not u or not acc or acc["status"] != "active":
         raise HTTPException(404)
     lk = links(u, req_host(request), settings_for(acc["id"])["prefix"])
+    out = [l for _, l in lk]
+    cfg = get_kv(acc["id"], "pool")
+    if cfg and cfg.get("sub"):   # clean IPs and locations are appended after the normal links
+        ips = cfg.get("ips", [])[:max(1, int(cfg.get("n", 10)))]
+        for _, l in lk:
+            for x in ips:
+                h, _, p = x.partition(":")
+                out.append(with_ip(l, h, p))
+            for loc in cfg.get("locs", []):
+                out.append(with_ip(l, loc["h"], loc["p"]))
     h = {"subscription-userinfo": f"upload={u['up']}; download={u['down']}; total={u['limit_bytes']}; expire={u['expire']}",
          "profile-update-interval": "1", "Cache-Control": "no-store",
          "profile-title": "base64:" + base64.b64encode(TITLE.encode()).decode()}
-    return Response(base64.b64encode("\n".join(l for _, l in lk).encode()), media_type="text/plain", headers=h)
+    return Response(base64.b64encode("\n".join(out).encode()), media_type="text/plain", headers=h)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _admin_html = None
